@@ -231,6 +231,49 @@ def field_wl_treams(params, cfg):
     intf = anp.array(anp.sum(anp.abs(ffwd.__array__())**2, axis = -1)).reshape(d_solid_surf.size)
     return intf, intb
 
+def from_array(tm, basis):
+    """S-matrix from an array of (cylindrical) T-matrices.
+
+    Create a S-matrix for a two-dimensional array of objects described by the
+    T-Matrix or an one-dimensional array of objects described by a cylindrical
+    T-matrix.
+
+    Args:
+        tm (TMatrix or TMatrixC): (Cylindrical) T-matrix to place in the array.
+        basis (PlaneWaveBasisByComp): Basis definition.
+        eta (float or complex, optional): Splitting parameter in the lattice sum.
+
+    Returns:
+        SMatrix
+    """
+    if isinstance(tm, treams.TMatrixC):
+        basis = basis.permute(-1)
+    pu, pd = (tm.expandlattice(basis=basis, modetype=i) for i in ("up", "down"))
+    au, ad = (tm.expand.eval_inv(basis, i) for i in ("up", "down"))
+    eye = anp.eye(len(basis))
+    res = treams.SMatrices([[eye + pu @ au, pu @ ad], [pd @ au, eye + pd @ ad]])
+
+    res_mult = []
+    for l in range(1, tm.basis.l.max()+1):
+        for em in anp.unique(tm.basis.pol):
+            m_sca = tm.basis.m
+            l_sca = tm.basis.l
+            pol_sca = tm.basis.pol
+            arg1 = (l == l_sca)
+            arg2 = (pol_sca == em)
+            mask = (arg1 & arg2)
+            pui = pu[:, mask]
+            pdi = pd[:, mask]
+            aui = au[mask, :]
+            adi = ad[mask, :]
+            #resi = cls([[eye + pui @ aui, pui @ adi], [pdi @ aui, eye + pdi @ adi]])
+            resi = treams.SMatrices([[ pui @ aui, pui @ adi], [pdi @ aui, pdi @ adi]])
+
+            res_mult.append(resi)
+
+    if isinstance(tm, treams.TMatrixC):
+        res = res.permute()
+    return res, res_mult
 
 def dreams_rcd(params, eps_object, k0, cfg):
     pitch       = cfg["pitch"]
@@ -249,7 +292,7 @@ def dreams_rcd(params, eps_object, k0, cfg):
         jnp.full((nobj,), eps_object),
         jnp.full((nobj,), eps_medium)
     ], axis=1)
-
+    # print("call smat")
     S, modes = smat_spheres(
         radii, epsilons, eps_medium, lmax, k0, pos, helicity,
         kx, ky, pitch, rmax_coef=rmax_coef, lmax_glob=lmax_glob

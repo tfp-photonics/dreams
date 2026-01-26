@@ -242,6 +242,47 @@ def xs(tmat, illu, k0, epsilon,  flux=0.5, num = 1, positions = np.zeros(3), hel
         -0.5 * np.real(illu.conjugate().T @ p_invksq) / flux,
     )
 
+def xs_ext_avg(tm, ks):
+    r"""Rotation and polarization averaged extinction cross section.
+
+    The average is calculated as
+
+    .. math::
+
+        \langle \sigma_\mathrm{ext} \rangle
+        = -2 \pi \sum_{slm} \frac{\Re(T_{slm,slm})}{k_s^2}
+
+    where :math:`k_s` is the wave number in the embedding medium for the
+    polarization :math:`s`. It is only implemented for global T-matrices.
+
+    Returns:
+        float or complex
+    """
+    res = -2 * np.pi * tm.trace().real / (ks * ks)
+
+    return res
+
+def xs_sca_avg(tm, ks):
+    r"""Rotation and polarization averaged scattering cross section.
+
+    The average is calculated as
+
+    .. math::
+
+        \langle \sigma_\mathrm{sca} \rangle
+        = 2 \pi \sum_{slm} \sum_{s'l'm'}
+        \frac{|T_{slm,s'l'm'}|^2}{k_s^2}
+
+    where :math:`k_s` is the wave number in the embedding medium for the
+    polarization :math:`s`. It is only implemented for global T-matrices.
+
+    Returns:
+        float or complex
+    """
+    re, im = tm.real, tm.imag
+    res = 2 * np.pi * np.sum((re * re + im * im) / (ks * ks))
+    return res.real
+
 def sphere_parity(lmax, k, rad, epsilon, mu=None):
     """
     T-matrix (parity basis) of a single homogeneous sphere.
