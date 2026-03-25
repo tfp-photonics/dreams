@@ -11,7 +11,6 @@ from dreams.jax_waves import plane_wave
 from dreams.jax_la_bounded import lsumsw2d_shift_vmap
 from dreams.jax_coord import car2pol as car2pol_jax
 from dreams.jax_recursive import incgamma, _redincgamma
-from dreams.jax_la_bounded import _recsw2d
 from dreams.jax_misc import diffr_orders_circle as diffr_orders_circle_jax
 
 def test_diffr_orders_circle_square_exact():

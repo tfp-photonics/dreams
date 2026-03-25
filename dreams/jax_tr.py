@@ -10,11 +10,11 @@ from dreams.jax_smat import (
     propagation,
     sdefaultmodes,
     stack,
-    
 )
-from dreams.jax_misc import wave_vec_z,  defaultmodes, refractive_index, basischange
+from dreams.jax_misc import wave_vec_z, defaultmodes, refractive_index, basischange
 from dreams.jax_tmat import global_tmat, tmats_no_int
 from dreams.jax_misc import diffr_orders_circle
+
 
 def illuminate(sm, illu, illu2=None, /, *, smat=None):
     """Field coefficients above and below the S-matrix.
@@ -42,7 +42,7 @@ def illuminate(sm, illu, illu2=None, /, *, smat=None):
     modetype = getattr(illu, "modetype", "up")
     if isinstance(modetype, tuple):
         modetype = modetype[max(-2, -len(modetype))]
-        
+
     illu2 = np.zeros(np.shape(illu)[-2:], dtype=illu.dtype) if illu2 is None else illu2
 
     if modetype == "down":
@@ -52,20 +52,17 @@ def illuminate(sm, illu, illu2=None, /, *, smat=None):
         field_up = sm[0, 0] @ illu + sm[0, 1] @ illu2
         field_down = sm[1, 0] @ illu + sm[1, 1] @ illu2
         return field_up, field_down
-    
+
     n = sm[0, 0].shape[0]
     stmp = np.eye(n, dtype=sm[0, 0].dtype) - sm[0, 1] @ smat[1, 0]
-    field_in_up = np.linalg.solve(
-        stmp, sm[0, 0] @ illu + sm[0, 1] @ smat[1, 1] @ illu2
-    )
+    field_in_up = np.linalg.solve(stmp, sm[0, 0] @ illu + sm[0, 1] @ smat[1, 1] @ illu2)
     field_in_down = smat[1, 0] @ field_in_up + smat[1, 1] @ illu2
     field_up = smat[0, 1] @ illu2 + smat[0, 0] @ field_in_up
     field_down = sm[1, 0] @ illu + sm[1, 1] @ field_in_down
     return field_up, field_down, field_in_up, field_in_down
 
 
-
-def poynting_avg_z( modes, k0, epsilon, mu, poltype, modetype):
+def poynting_avg_z(modes, k0, epsilon, mu, poltype, modetype):
     r"""Time-averaged z-component of the Poynting vector.
 
     Calculate the time-averaged Poynting vector's z-component
@@ -91,7 +88,7 @@ def poynting_avg_z( modes, k0, epsilon, mu, poltype, modetype):
             Polarization basis of the modes.
         modetype ({"up", "down"}):
             Direction of propagation.
-            
+
     Returns:
         (a, b):
             Two arrays of shape ``(N, N)`` to be used as quadratic forms
@@ -113,10 +110,10 @@ def poynting_avg_z( modes, k0, epsilon, mu, poltype, modetype):
         b = selection * ((1 - pol) * gamma.conjugate() - pol * gamma) * 0.25
         return a, b
     if poltype == "helicity":
-        hpol = 2 * pol - 1                              # length N, values -1,+1
-        hh = hpol[:, None] * hpol[None, :]              # (N,N)
-        gamma_conj_col = gamma.conj()[:, None]   # (N, 1), uses row index i
-        gamma_row      = gamma[None, :]          # (1, N), uses column index j
+        hpol = 2 * pol - 1  # length N, values -1,+1
+        hh = hpol[:, None] * hpol[None, :]  # (N,N)
+        gamma_conj_col = gamma.conj()[:, None]  # (N, 1), uses row index i
+        gamma_row = gamma[None, :]  # (1, N), uses column index j
         a = selection * (hh * gamma_conj_col + gamma_row) * 0.25
         b = selection * (hh * gamma_conj_col - gamma_row) * 0.25
         return a, b
@@ -124,7 +121,9 @@ def poynting_avg_z( modes, k0, epsilon, mu, poltype, modetype):
 
 
 # @partial(jit, static_argnums=(1, 2, 3, 6, 7, 8))
-def tr(q, k0, pitch, helicity, illu, basis, epsilon=1, mu=1, direction=1, modetype="up"):
+def tr(
+    q, k0, pitch, helicity, illu, basis, epsilon=1, mu=1, direction=1, modetype="up"
+):
     """Transmittance and reflectance for one S-matrix.
 
     Args:
@@ -144,7 +143,7 @@ def tr(q, k0, pitch, helicity, illu, basis, epsilon=1, mu=1, direction=1, modety
     """
     if direction not in (-1, 1):
         raise ValueError(f"direction must be '-1' or '1', but is '{direction}''")
-    trans, refl = illuminate(q, illu)    
+    trans, refl = illuminate(q, illu)
     if not isinstance(epsilon, tuple):
         epsilon = epsilon, epsilon
     if helicity:
@@ -152,16 +151,14 @@ def tr(q, k0, pitch, helicity, illu, basis, epsilon=1, mu=1, direction=1, modety
     else:
         poltype = "parity"
     paz = [poynting_avg_z(basis, k0, m, mu, poltype, modetype) for m in epsilon]
-    #paz = [poynting_avg_z(anp.asarray(basis), k0, m, mu, poltype, modetype) for m in epsilon]
+    # paz = [poynting_avg_z(anp.asarray(basis), k0, m, mu, poltype, modetype) for m in epsilon]
     s_t = np.real(trans.conjugate().T @ paz[0][0] @ trans)
     s_r = np.real(refl.conjugate().T @ paz[1][0] @ refl)
     s_i = np.real(np.conjugate(illu).T @ paz[1][0] @ illu)
     s_ir = np.real(
-        refl.conjugate().T @ paz[1][1] @ illu
-        - np.conjugate(illu).T @ paz[1][1] @ refl
-    )  
+        refl.conjugate().T @ paz[1][1] @ illu - np.conjugate(illu).T @ paz[1][1] @ refl
+    )
     return np.array([s_t / (s_i + s_ir), s_r / (s_i + s_ir)])
-
 
 
 def field_outside(q, modes, illu):
@@ -242,7 +239,7 @@ def poynting_avg(coeffs, modes, ks, helicity, epsilon=1, mu=None, above=True):
             res = res + a @ (np.conjugate(b) * np.conjugate(pref[0]) * dirb)
         for (dira, _, a), (dirb, _, b) in itertools.product(allcoeffs[1::2], repeat=2):
             res = res + a @ (np.conjugate(b) * pref[1] * dira)
-        res = res * 0.5    
+        res = res * 0.5
     return np.real(res / anp.conjugate(anp.sqrt(mu[choice] / epsilon[choice])))
 
 
@@ -263,8 +260,8 @@ def smat_spheres(
     mu=1,
     kappa=0,
     rmax_coef=1,
-    local = False,
-    lmax_glob =  None
+    local=False,
+    lmax_glob=None,
 ):
     """S-matrix for a periodic array of spheres.
 
@@ -294,7 +291,9 @@ def smat_spheres(
     if lmax_glob is None:
         lmax_glob = lmax
     if not local:
-        tmat, _, _ = global_tmat(positions, radii, epsilons, lmax, k0,  lmax_glob=lmax_glob, helicity=helicity)
+        tmat, _, _ = global_tmat(
+            positions, radii, epsilons, lmax, k0, lmax_glob=lmax_glob, helicity=helicity
+        )
         positions = anp.zeros((1, 3))
     else:
         tmat = tmats_no_int(radii, epsilons, lmax, k0, helicity)
@@ -314,9 +313,10 @@ def smat_spheres(
         kappa=kappa,
         rmax_coef=rmax_coef,
         positions=positions,
-        nondifsum=True #for now 
-    ) 
+        nondifsum=True,  # for now
+    )
     return smat, modes
+
 
 # @partial(jit, static_argnums=(1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14))
 def smat_array(
@@ -338,13 +338,13 @@ def smat_array(
 ):
     a = anp.array([[pitch, 0], [0, pitch]])
     b = la.reciprocal(a)
-    
+
     if nondifsum:
         kpar = anp.array([kx, ky])
-        kpars = kpar + la.diffr_orders_circle(b, rmax=rmax_coef * k0) @ b    
+        kpars = kpar + la.diffr_orders_circle(b, rmax=rmax_coef * k0) @ b
     else:
         kpar = np.array([kx, ky])
-        kpars = kpar + diffr_orders_circle(b, rmax=rmax_coef * k0) @ b   
+        kpars = kpar + diffr_orders_circle(b, rmax=rmax_coef * k0) @ b
     answer = arrayt(
         tmat,
         lmax,
@@ -364,7 +364,7 @@ def smat_array(
     return answer, modes
 
 
-#@partial(jit, static_argnums=(1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14))
+# @partial(jit, static_argnums=(1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14))
 def smat_spheres_full(
     radii,
     epsilons,
@@ -383,52 +383,53 @@ def smat_spheres_full(
     mu=1,
     kappa=0,
     rmax_coef=1,
-    local = False, 
-    lmax_glob = None
+    local=False,
+    lmax_glob=None,
 ):
     if lmax_glob == None:
         lmax_glob = lmax
     if eps_below is None:
-        eps_below = eps_medium 
+        eps_below = eps_medium
     if eps_above is None:
         eps_above = eps_medium
     smat, modes = smat_spheres(
-    radii,
-    epsilons,
-    eps_medium,
-    lmax,
-    k0,
-    positions,
-    helicity,
-    kx,
-    ky,
-    pitch,
-    origin=origin,
-    eta=eta,
-    mu=mu,
-    kappa=kappa,
-    rmax_coef=rmax_coef,
-    local = local,
-    lmax_glob = lmax_glob
-)
-    #return smat, modes
-    sfull, modes =stacking(
-    smat,
-    modes,         
-    helicity,
-    kx,
-    ky,
-    k0,
-    pitch,
-    eps_medium,
-    eps_below=eps_below,
-    eps_above=eps_above,
-    mu=mu,
-    kappa=kappa)
+        radii,
+        epsilons,
+        eps_medium,
+        lmax,
+        k0,
+        positions,
+        helicity,
+        kx,
+        ky,
+        pitch,
+        origin=origin,
+        eta=eta,
+        mu=mu,
+        kappa=kappa,
+        rmax_coef=rmax_coef,
+        local=local,
+        lmax_glob=lmax_glob,
+    )
+    # return smat, modes
+    sfull, modes = stacking(
+        smat,
+        modes,
+        helicity,
+        kx,
+        ky,
+        k0,
+        pitch,
+        eps_medium,
+        eps_below=eps_below,
+        eps_above=eps_above,
+        mu=mu,
+        kappa=kappa,
+    )
     return sfull, modes
 
 
-#@partial(jit, static_argnums=(1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14))
+# @partial(jit, static_argnums=(1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14))
 def smat_full(
     tmat,
     lmax,
@@ -448,40 +449,42 @@ def smat_full(
     positions=None,
 ):
     smat, modes = smat_array(
-    tmat,
-    lmax,
-    helicity,
-    kx,
-    ky,
-    k0,
-    pitch,
-    eps_medium,
-    origin=origin,
-    eta=eta,
-    mu=mu,
-    kappa=kappa,
-    rmax_coef=rmax_coef,
-    positions=positions,
-    nondifsum=True
-)
+        tmat,
+        lmax,
+        helicity,
+        kx,
+        ky,
+        k0,
+        pitch,
+        eps_medium,
+        origin=origin,
+        eta=eta,
+        mu=mu,
+        kappa=kappa,
+        rmax_coef=rmax_coef,
+        positions=positions,
+        nondifsum=True,
+    )
     sfull, modes = stacking(
-    smat,
-    modes,         
-    helicity,
-    kx,
-    ky,
-    k0,
-    pitch,
-    eps_medium,
-    eps_below=eps_below,
-    eps_above=eps_above,
-    mu=mu,
-    kappa=kappa)
+        smat,
+        modes,
+        helicity,
+        kx,
+        ky,
+        k0,
+        pitch,
+        eps_medium,
+        eps_below=eps_below,
+        eps_above=eps_above,
+        mu=mu,
+        kappa=kappa,
+    )
     return sfull, modes
+
 
 def stacking(
     smat,
-    modes,         
+    modes,
     helicity,
     kx,
     ky,
@@ -500,18 +503,15 @@ def stacking(
     if not helicity:
         smat = changebasis(smat, modes)
     r = np.array([0, 0, pitch / 2])
-    inter1 = interface(
-        eps_above, eps_medium, k0, modes, mu=mu, kappa=kappa
-    )
+    inter1 = interface(eps_above, eps_medium, k0, modes, mu=mu, kappa=kappa)
     prop = propagation(eps_medium, r, k0, modes, mu=mu, kappa=kappa)
-    inter2 = interface(
-        eps_medium, eps_below, k0, modes, mu=mu, kappa=kappa
-    )
+    inter2 = interface(eps_medium, eps_below, k0, modes, mu=mu, kappa=kappa)
     stck = [inter1, prop, smat, prop, inter2]
     st = stack(stck)
     if not helicity:
         st = changebasis(st, modes)
     return st, modes
+
 
 def changebasis(q, modes=None):
     """

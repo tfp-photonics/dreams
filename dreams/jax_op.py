@@ -11,6 +11,7 @@ from jax import config, debug
 config.update("jax_enable_x64", True)
 from jax.lax import lgamma as loggamma
 
+
 def sw_translate(
     lambda_, mu, pol, l, m, qol, kr, theta, phi, helicity=False, singular=True
 ):
@@ -56,6 +57,7 @@ def sw_translate(
         return translate_sp(lambda_, mu, pol, l, m, qol, kr, theta, phi)
     return translate_rp(lambda_, mu, pol, l, m, qol, kr, theta, phi)
 
+
 def translate_rp(lambda_, mu, pol, l, m, qol, kr, theta, phi):
     mask = (pol == qol) & ((pol == 0) | (pol == 1))
     answer = tl_vsw_rA(lambda_, mu, l, m, kr, theta, phi) * mask + tl_vsw_rB(
@@ -93,7 +95,18 @@ def translate_rh(lambda_, mu, pol, l, m, qol, kr, theta, phi):
 
     return answer
 
-def sw_expand(positions, modes, k0, helicity, epsilon, mu=1, kappa=0,  modetype = "singular", to_modetype = None ):   
+
+def sw_expand(
+    positions,
+    modes,
+    k0,
+    helicity,
+    epsilon,
+    mu=1,
+    kappa=0,
+    modetype="singular",
+    to_modetype=None,
+):
     """
     Spherical-wave translation matrix for a set of scatterers.
 
@@ -131,9 +144,9 @@ def sw_expand(positions, modes, k0, helicity, epsilon, mu=1, kappa=0,  modetype 
     positions = np.reshape(positions, (-1, 3))
     ind = positions[:, None, :] - positions
     rs = car2sph(ind)
-    
+
     rs = np.array(rs)
-    
+
     ks = k0 * refractive_index(epsilon, mu, kappa)
     pidx, l, m, pol = modes
     translation = sw_translate(
@@ -146,6 +159,7 @@ def sw_expand(positions, modes, k0, helicity, epsilon, mu=1, kappa=0,  modetype 
         singular=modetype != to_modetype,
     )
     return translation
+
 
 def pw_translate(kx, ky, kz, x, y, z, where=True):
     r"""translate(kx, ky, kz, x, y, z)
@@ -163,10 +177,24 @@ def pw_translate(kx, ky, kz, x, y, z, where=True):
         complex
     """
     zterm = kz * z
-    ans =  np.where(where, np.exp(+1j * (kx * x + ky * y + zterm)), 0)
+    ans = np.where(where, np.exp(+1j * (kx * x + ky * y + zterm)), 0)
     return ans
 
-def _sw_pw_expand(basis, pidx, l, m , pol, positions,  k0, material, poltype, modetype=None, where=True, treams=True):
+
+def _sw_pw_expand(
+    basis,
+    pidx,
+    l,
+    m,
+    pol,
+    positions,
+    k0,
+    material,
+    poltype,
+    modetype=None,
+    where=True,
+    treams=True,
+):
     """Plane-wave to spherical-wave expansion matrix.
 
     Args:
@@ -192,8 +220,8 @@ def _sw_pw_expand(basis, pidx, l, m , pol, positions,  k0, material, poltype, mo
 
     if treams:
         kvecs = basis.kvecs(k0, material, modetype)
-        pw2sw =  to_sw(
-            *(m[:, None] for m in (l, m , pol)),
+        pw2sw = to_sw(
+            *(m[:, None] for m in (l, m, pol)),
             *kvecs,
             basis.pol,
             poltype=poltype,
@@ -204,9 +232,11 @@ def _sw_pw_expand(basis, pidx, l, m , pol, positions,  k0, material, poltype, mo
         ks = k0 * refractive_index(material)
         ks = ks[plane_pol]
         kvecs = ks * basis[:, 0], ks * basis[:, 1], ks * basis[:, 2]
-        pw2sw =  to_sw(
-            *(m[:, None] for m in (l, m , pol)),
-            ks * basis[:, 0], ks * basis[:, 1], ks * basis[:, 2] ,
+        pw2sw = to_sw(
+            *(m[:, None] for m in (l, m, pol)),
+            ks * basis[:, 0],
+            ks * basis[:, 1],
+            ks * basis[:, 2],
             plane_pol,
             poltype=poltype,
         )
@@ -222,28 +252,27 @@ def _sw_pw_expand(basis, pidx, l, m , pol, positions,  k0, material, poltype, mo
     return res
 
 
-
 def to_sw(l, m, polsw, kx, ky, kz, polpw, poltype=None):
     """
-   Coefficient for the expansion of a plane wave in spherical waves.
-    Returns the coefficient for the basis change from a plane wave to a spherical wave.
-    For multiple positions only diagonal values (with respect to the position) are
-    returned.
-    Args:
-        l (array_like): Degree(s) of the spherical waves.
-        m (array_like): Order(s) of the spherical waves.
-        polsw (array_like): Polarizations of the spherical waves
-            (0/1).
-        kx (array_like): x components of the plane-wave wave vectors.
-        ky (array_like): y components of the plane-wave wave vectors.
-        kz (array_like): z components of the plane-wave wave vectors.
-        polpw (array_like): Polarizations of the plane waves (0/1).
-        poltype (str, optional): Polarization type, "helicity" or
-            "parity". If None, uses config.POLTYPE.
-    Returns:
-        jax.Array: Expansion coefficients of shape (N_sph, N_pw),
-        where N_sph is the number of spherical modes and N_pw is the
-        number of plane-wave modes.
+    Coefficient for the expansion of a plane wave in spherical waves.
+     Returns the coefficient for the basis change from a plane wave to a spherical wave.
+     For multiple positions only diagonal values (with respect to the position) are
+     returned.
+     Args:
+         l (array_like): Degree(s) of the spherical waves.
+         m (array_like): Order(s) of the spherical waves.
+         polsw (array_like): Polarizations of the spherical waves
+             (0/1).
+         kx (array_like): x components of the plane-wave wave vectors.
+         ky (array_like): y components of the plane-wave wave vectors.
+         kz (array_like): z components of the plane-wave wave vectors.
+         polpw (array_like): Polarizations of the plane waves (0/1).
+         poltype (str, optional): Polarization type, "helicity" or
+             "parity". If None, uses config.POLTYPE.
+     Returns:
+         jax.Array: Expansion coefficients of shape (N_sph, N_pw),
+         where N_sph is the number of spherical modes and N_pw is the
+         number of plane-wave modes.
     """
     poltype = config.POLTYPE if poltype is None else poltype
     if poltype == "helicity":
@@ -252,19 +281,28 @@ def to_sw(l, m, polsw, kx, ky, kz, polpw, poltype=None):
         return _to_sw_p(l, m, polsw, kx, ky, kz, polpw)
     raise ValueError(f"invalid poltype '{poltype}'")
 
+
 def _to_sw_h(l, m, polvsw, kx, ky, kz, polpw):
     kxy = np.sqrt(kx * kx + ky * ky)
     pref = np.where(kxy == 0, 1, np.power((kx - 1j * ky) / kxy, m))
     k = np.sqrt(kx * kx + ky * ky + kz * kz)
     costheta = kz / k
-    ans =  (
-        2 * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
-        * np.exp(0.5 * (loggamma((l - m + 1).astype(float)) - loggamma((l + m + 1).astype(float))))
+    ans = (
+        2
+        * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
+        * np.exp(
+            0.5
+            * (
+                loggamma((l - m + 1).astype(float))
+                - loggamma((l + m + 1).astype(float))
+            )
+        )
         * np.power(1j, l)
         * pref
     ) * (tau_fun(l, m, costheta) + (2 * polpw - 1) * pi_fun(l, m, costheta))
     ans = np.where(polvsw != polpw, 0.0j, ans)
     return ans
+
 
 def _to_sw_p(l, m, polvsw, kx, ky, kz, polpw):
     kxy = np.sqrt(kx * kx + ky * ky)
@@ -272,12 +310,21 @@ def _to_sw_p(l, m, polvsw, kx, ky, kz, polpw):
     k = np.sqrt(kx * kx + ky * ky + kz * kz)
     costheta = kz / k
     pref = pref * (
-        2 * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
-        * np.exp(0.5 * (loggamma((l - m + 1).astype(float)) - loggamma((l + m + 1).astype(float))))
+        2
+        * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
+        * np.exp(
+            0.5
+            * (
+                loggamma((l - m + 1).astype(float))
+                - loggamma((l + m + 1).astype(float))
+            )
+        )
         * np.pow(1j, l)
     )
-    ans = np.where(polvsw == polpw, pref * tau_fun(l, m, costheta), pref * pi_fun(l, m, costheta))
-    return ans 
+    ans = np.where(
+        polvsw == polpw, pref * tau_fun(l, m, costheta), pref * pi_fun(l, m, costheta)
+    )
+    return ans
 
 
 def rotate(t, phi, theta, psi, rad=True, modes=None):
@@ -309,9 +356,9 @@ def rotate(t, phi, theta, psi, rad=True, modes=None):
         ndarray: Rotated T-matrix with the same shape as `t`.
     """
     if not rad:
-        phi  = phi  * np.pi / 180.0
+        phi = phi * np.pi / 180.0
         theta = theta * np.pi / 180.0
-        psi  = psi  * np.pi / 180.0
+        psi = psi * np.pi / 180.0
 
     # Infer modes if not provided: assume single center (num=1)
     if modes is None:
@@ -321,22 +368,21 @@ def rotate(t, phi, theta, psi, rad=True, modes=None):
     pidx, l, m, pol = modes
     n = len(l)
 
-    l1   = l[:, None]
-    l2   = l[None, :]
-    m1   = m[:, None]
-    m2   = m[None, :]
+    l1 = l[:, None]
+    l2 = l[None, :]
+    m1 = m[:, None]
+    m2 = m[None, :]
     pol1 = pol[:, None]
     pol2 = pol[None, :]
     pidx1 = pidx[:, None]
     pidx2 = pidx[None, :]
     cond_pol = ((pol1 == 0) & (pol2 == 0)) | ((pol1 == 1) & (pol2 == 1))
-    cond_l   = (l1 == l2)
+    cond_l = l1 == l2
 
-    cond_pidx = (pidx1 == pidx2)
+    cond_pidx = pidx1 == pidx2
 
     cond = cond_pol & cond_l & cond_pidx
 
     # Wigner D-matrix on the allowed entries
     mat = np.where(cond, wignerd(l2, m1, m2, phi, theta, psi), 0.0)
     return mat @ t @ np.conj(mat).T
-

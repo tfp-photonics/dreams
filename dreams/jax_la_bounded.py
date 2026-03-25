@@ -8,7 +8,6 @@ from numpy import pi, sqrt
 from dreams.jax_recursive import incgamma, _intkambe, _redincgamma, choose_branch
 from dreams.jax_coord import car2pol
 
-
 config.update("jax_enable_x64", True)
 
 M_SQRT2 = sqrt(2.0)
@@ -17,6 +16,7 @@ M_SQRT2 = sqrt(2.0)
 # ---------------------------------------------------------------------------
 # Basic geometry helpers
 # ---------------------------------------------------------------------------
+
 
 def area(a, b):
     """(Signed) area between two-vectors a and b."""
@@ -35,6 +35,7 @@ def volume(a, b, c):
 # ---------------------------------------------------------------------------
 # Incomplete-gamma based helpers
 # ---------------------------------------------------------------------------
+
 
 def zero3d(eta, size_loop):
     r"""
@@ -76,6 +77,7 @@ def _check_eta(eta, k, a, ds, dl):
 # 2D real-space summand
 # ---------------------------------------------------------------------------
 
+
 def _realsw2d(l, m, kr, phi, eta, size_loop):
     r"""
     Summand of the real contribution in a 2D lattice using spherical solutions
@@ -90,13 +92,13 @@ def _realsw2d(l, m, kr, phi, eta, size_loop):
 
     """
     kr = kr.flatten()[0]
-    return (np.power(kr, l) *
-            _intkambe(2 * l, kr, eta, size_loop) *
-            np.exp(1j * m * phi))
+    return np.power(kr, l) * _intkambe(2 * l, kr, eta, size_loop) * np.exp(1j * m * phi)
+
 
 # ---------------------------------------------------------------------------
 # Reciprocal lattice helpers
 # ---------------------------------------------------------------------------
+
 
 def recvec2(a):
     """Reciprocal vectors in a two-dimensional lattice."""
@@ -108,7 +110,6 @@ def recvec2(a):
     b01 = -a[1][0] * ar
     b10 = -a[0][1] * ar
     b11 = a[0][0] * ar
-    #b = anp.array([[b00, b01], [b10, b11]])
     b = np.array([[b00, b01], [b10, b11]])
     return b
 
@@ -117,14 +118,16 @@ def recvec2(a):
 # 2D lattice sums: public entry points
 # ---------------------------------------------------------------------------
 
+
 def lsumsw2d(l, m, k, kpar, a, r, eta, size_loop):
     """2D lattice sum (real + reciprocal)."""
     eta = _check_eta(eta, k, a, 3, 2)
     recsum = recsumsw2d(l, m, k, kpar, a, r, eta, size_loop)
     realsum = realsumsw2d(l, m, k, kpar, a, r, eta, size_loop)
-    return recsum + realsum 
+    return recsum + realsum
 
-#@partial(jax.jit)
+
+# @partial(jax.jit)
 def lsumsw2d_shift_vmap(ls, ms, ks, kpar, a, rs, eta):
     """
     Vectorized version of lsumsw2d over:
@@ -135,7 +138,7 @@ def lsumsw2d_shift_vmap(ls, ms, ks, kpar, a, rs, eta):
     Shape of result: (len(rs), rs.shape[1], len(ks), len(ls))
     """
     kpar = kpar.flatten()
-    size_loop = 25 # anp.max(ls - anp.abs(ms) + 1)
+    size_loop = 25  # anp.max(ls - anp.abs(ms) + 1)
 
     def func(ii, ji, ki, li):
         return lsumsw2d(
@@ -168,6 +171,7 @@ def lsumsw2d_shift_vmap(ls, ms, ks, kpar, a, rs, eta):
 # 2D real-space lattice sum
 # ---------------------------------------------------------------------------
 
+
 def realsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
     """Real-space contribution (2D). Arguments are passed elementwise."""
 
@@ -194,7 +198,6 @@ def realsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
             cond2 = np.abs(realsum - pprev) < 1e-10
             return (cond1 & cond2) == False
 
-
         def body_fun(carry):
             point, realsum, prev, pprev, ind_while, ind_for, ind = carry
             i = ind_for[ind]
@@ -220,12 +223,18 @@ def realsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
         eta_loc = _check_eta(eta, k, a, 3, 2)
 
         ind_while = anp.array(
-            [j for i in anp.arange(start, loop_tot)
-             for j in anp.arange(8 * i + (i == 0))]
+            [
+                j
+                for i in anp.arange(start, loop_tot)
+                for j in anp.arange(8 * i + (i == 0))
+            ]
         )
         ind_for = anp.array(
-            [i for i in anp.arange(start, loop_tot)
-             for _ in anp.arange(8 * i + (i == 0))]
+            [
+                i
+                for i in anp.arange(start, loop_tot)
+                for _ in anp.arange(8 * i + (i == 0))
+            ]
         )
         point = -np.ones(2) * ind_for[0]
         ind = 0
@@ -251,9 +260,7 @@ def realsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
         )
 
     ans = lax.cond(
-        (kpar[:2] == 0.0).all()
-        & (ri[:2] == 0.0).all()
-        & ((m % 2) == 1),
+        (kpar[:2] == 0.0).all() & (ri[:2] == 0.0).all() & ((m % 2) == 1),
         lambda: 0.0j,
         lambda: lax.cond(
             (l + m) % 2 == 1,
@@ -271,6 +278,7 @@ def realsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
 # ---------------------------------------------------------------------------
 # 2D reciprocal-space lattice sum
 # ---------------------------------------------------------------------------
+
 
 def recsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
 
@@ -304,21 +312,19 @@ def recsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
             vec = 1 * b @ pointf + 1 * vec
             coord = car2pol(vec.flatten())
 
-            add = _recsw2d(
-               l, m, coord[0] / k, coord[1], eta_loc, size_loop
-            ) * np.exp(-1j * np.dot(vec, ri[:-1]))
+            add = _recsw2d(l, m, coord[0] / k, coord[1], eta_loc, size_loop) * np.exp(
+                -1j * np.dot(vec, ri[:-1])
+            )
             cond, point = cubeedge_next(point, dim, i)
             recsum = recsum + add
             return (point, recsum, prev, pprev, ind_while, ind_for, ind + 1)
 
         loop_tot = 20
         ind_while = anp.array(
-            [j for i in anp.arange(0, loop_tot)
-             for j in anp.arange(8 * i + (i == 0))]
+            [j for i in anp.arange(0, loop_tot) for j in anp.arange(8 * i + (i == 0))]
         )
         ind_for = anp.array(
-            [i for i in anp.arange(0, loop_tot)
-             for _ in anp.arange(8 * i + (i == 0))]
+            [i for i in anp.arange(0, loop_tot) for _ in anp.arange(8 * i + (i == 0))]
         )
         point = -np.ones(2) * ind_for[0]
         ind = 0
@@ -329,24 +335,17 @@ def recsumsw2d(l, m, k, kpar, a, ri, eta, size_loop):
             (point, recsum, prev, pprev, ind_while, ind_for, ind),
             max_steps=len(ind_for),
         )
-
-        # recsum = recsum * (
-        #     np.sqrt((2 * l + 1) * 0.5)
-        #     * np.power(1j, m)
-        #     * np.exp((loggamma(l + m + 1.0) + loggamma(l - m + 1.0)) * 0.5)
-        #     / (np.abs(area(a[0], a[1])) * k * k * (2 ** l))
-        # )
-        # recsum = np.where(
-        #     (l == 0) & (ri == 0.0).all(),
-        #     recsum + zero3d(eta_loc, size_loop),
-        #     recsum,
-        # )
+        recsum = recsum * (
+            np.sqrt((2 * l + 1) * 0.5)
+            * np.power(1j, m)
+            * np.exp((loggamma(l + m + 1.) + loggamma(l - m + 1.)) * 0.5)
+            / (np.abs(area(a[0], a[1])) * k * k * (2**l))
+        )
+        recsum  = np.where((l == 0) & (ri == 0.0).all(), recsum + zero3d(eta, size_loop), recsum)        
         return recsum
 
     ans = lax.cond(
-        (kpar[:2] == 0.0).all()
-        & (ri[:2] == 0.0).all()
-        & ((m % 2) == 1),
+        (kpar[:2] == 0.0).all() & (ri[:2] == 0.0).all() & ((m % 2) == 1),
         lambda: 0.0j,
         lambda: lax.cond(
             (l + m) % 2 == 1,
@@ -367,6 +366,7 @@ def _recsw2d(l, m, beta, phi, eta, size_loop):
     """
 
     val = (beta * beta - 1) / (2 * eta * eta)
+
     def branch_0(l, m, beta, phi, eta):
         n = np.asarray(0.5 - l // 2, dtype=np.float64)
         l2 = np.asarray(l // 2 + 1, dtype=np.float64)
@@ -382,13 +382,9 @@ def _recsw2d(l, m, beta, phi, eta, size_loop):
     def branch_1(l, m, beta, phi, eta):
         res = 0.0j
         power = choose_branch(beta, np.power(beta, l))
-        #power =  np.power(beta, l)
         macc = power / (
             eta
-            * np.exp(
-                loggamma(((l + m) // 2 + 1.0))
-                + loggamma(((l - m) // 2 + 1.0))
-            )
+            * np.exp(loggamma(((l + m) // 2 + 1.0)) + loggamma(((l - m) // 2 + 1.0)))
         )
         mult = 2 * eta * eta / (beta * beta)
         fixed_array = anp.arange(size_loop)
@@ -427,6 +423,7 @@ def _recsw2d(l, m, beta, phi, eta, size_loop):
 # ---------------------------------------------------------------------------
 # Cube iteration utilities
 # ---------------------------------------------------------------------------
+
 
 def cubeedge_next(r, d, n):
     """

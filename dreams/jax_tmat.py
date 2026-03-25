@@ -9,6 +9,7 @@ from dreams.jax_op import sw_translate, sw_expand
 from dreams.jax_misc import defaultmodes, refractive_index, defaultlmax, basischange
 from jax import config, jit
 from jax.scipy.linalg import block_diag
+
 config.update("jax_enable_x64", True)
 import treams.special as sp
 
@@ -16,27 +17,33 @@ import treams.special as sp
 def _offset(l):
     return 2 * (l - 1) * (l + 1)
 
+
 def _place_Tl(T, Tl, l, lmax):
     """
     Place 2x2 block Tl along the diagonal, repeated (2l+1) times,
     starting at offset(l). Works under jit/scan (no dynamic arange).
     """
-    start     = _offset(l)          
-    reps      = 2 * l + 1          
-    max_reps  = 2 * lmax + 1       
+    start = _offset(l)
+    reps = 2 * l + 1
+    max_reps = 2 * lmax + 1
 
     def body(T, m):
-        row = start + 2 * m         
+        row = start + 2 * m
+
         def do_update(T):
             return lax.dynamic_update_slice(T, Tl, (row, row))
+
         # Only update for the first 'reps' tiles
         T = lax.cond(m < reps, do_update, lambda T: T, T)
         return T, None
 
-    T, _ = lax.scan(body, T, np.arange(max_reps))   # max_reps is concrete
+    T, _ = lax.scan(body, T, np.arange(max_reps))  # max_reps is concrete
     return T
 
-def core_shell_sphere(lmax: int, k0: float, radii, epsilon, mu=None, kappa=None, poltype="helicity"):
+
+def core_shell_sphere(
+    lmax: int, k0: float, radii, epsilon, mu=None, kappa=None, poltype="helicity"
+):
     if mu is None:
         mu = np.ones_like(epsilon)
     if kappa is None:
@@ -46,12 +53,13 @@ def core_shell_sphere(lmax: int, k0: float, radii, epsilon, mu=None, kappa=None,
     if radii.shape[0] != len(epsilon) - 1:
         raise ValueError("incompatible lengths of radii and materials")
 
-    dim = 2*lmax*(lmax+2)
+    dim = 2 * lmax * (lmax + 2)
     T = np.zeros((dim, dim), dtype=np.complex128)
+
     def outer(T, l):
-        Tl = mie_one_l(l, k0, radii, epsilon, mu, kappa)   # (2,2)
-        Tl = Tl[::-1, ::-1]                             
-        T  = _place_Tl(T, Tl, l, lmax)                 
+        Tl = mie_one_l(l, k0, radii, epsilon, mu, kappa)  # (2,2)
+        Tl = Tl[::-1, ::-1]
+        T = _place_Tl(T, Tl, l, lmax)
         return T, None
 
     T, _ = lax.scan(outer, T, np.arange(1, lmax + 1))
@@ -61,6 +69,7 @@ def core_shell_sphere(lmax: int, k0: float, radii, epsilon, mu=None, kappa=None,
     mat = basischange(modes)
     T = mat.T @ T @ mat
     return T
+
 
 @partial(jit, static_argnums=(0, 4))
 def sphere(lmax, k0, rad, epsilon, helicity):
@@ -131,7 +140,10 @@ def elchi(positions, radii, epsilon, lmax=3, k=2 * np.pi):
     ans = np.linalg.norm(plus - minus) / np.sqrt(np.sum(np.power(np.abs(tglobal), 2)))
     return ans
 
-def xs_1(lind, tmat, illu, k0, epsilon,  flux=0.5, num = 1, positions = np.zeros(3), helicity=True):
+
+def xs_1(
+    lind, tmat, illu, k0, epsilon, flux=0.5, num=1, positions=np.zeros(3), helicity=True
+):
     r"""
     Partial scattering cross section for selected multipole orders and polarizations.
 
@@ -180,17 +192,17 @@ def xs_1(lind, tmat, illu, k0, epsilon,  flux=0.5, num = 1, positions = np.zeros
     p = tmat @ np.array(illu)
     ks = k0 * refractive_index(epsilon)
     p_invksq = p * np.power(ks[pol], -2)
-    swe =  sw_expand(positions, modes, k0, helicity, epsilon, modetype="singular")   
-    p_invksq = swe @ p_invksq 
-    e1 = (pol==1) & np.isin(l, lind)  
-    m1 = (pol==0) & np.isin(l, lind)  
-    tot =  0.5 * np.real(p.conjugate().T * p_invksq) / flux 
+    swe = sw_expand(positions, modes, k0, helicity, epsilon, modetype="singular")
+    p_invksq = swe @ p_invksq
+    e1 = (pol == 1) & np.isin(l, lind)
+    m1 = (pol == 0) & np.isin(l, lind)
+    tot = 0.5 * np.real(p.conjugate().T * p_invksq) / flux
     xs_e1 = np.sum(tot[e1])
     xs_m1 = np.sum(tot[m1])
-    return xs_e1 , xs_m1
+    return xs_e1, xs_m1
 
 
-def xs(tmat, illu, k0, epsilon,  flux=0.5, num = 1, positions = np.zeros(3), helicity=True):
+def xs(tmat, illu, k0, epsilon, flux=0.5, num=1, positions=np.zeros(3), helicity=True):
     r"""Scattering and extinction cross section.
 
     Possible for all T-matrices (global and local) in non-absorbing embedding. The
@@ -235,12 +247,13 @@ def xs(tmat, illu, k0, epsilon,  flux=0.5, num = 1, positions = np.zeros(3), hel
     p = tmat @ np.array(illu)
     ks = k0 * refractive_index(epsilon)
     p_invksq = p * np.power(ks[pol], -2)
-    swe =  sw_expand(positions, modes, k0, helicity, epsilon, modetype="singular")   
-    p_invksq = swe @ p_invksq 
+    swe = sw_expand(positions, modes, k0, helicity, epsilon, modetype="singular")
+    p_invksq = swe @ p_invksq
     return (
         0.5 * np.real(p.conjugate().T @ p_invksq) / flux,
         -0.5 * np.real(illu.conjugate().T @ p_invksq) / flux,
     )
+
 
 def xs_ext_avg(tm, ks):
     r"""Rotation and polarization averaged extinction cross section.
@@ -262,6 +275,7 @@ def xs_ext_avg(tm, ks):
 
     return res
 
+
 def xs_sca_avg(tm, ks):
     r"""Rotation and polarization averaged scattering cross section.
 
@@ -282,6 +296,7 @@ def xs_sca_avg(tm, ks):
     re, im = tm.real, tm.imag
     res = 2 * np.pi * np.sum((re * re + im * im) / (ks * ks))
     return res.real
+
 
 def sphere_parity(lmax, k, rad, epsilon, mu=None):
     """
@@ -310,6 +325,7 @@ def sphere_parity(lmax, k, rad, epsilon, mu=None):
     cnn = mie(lm, mu, epsilon, radii, k)
     return np.diag(cnn.flatten()) * (-1)
 
+
 # @partial(jit, static_argnums=(2, 4))
 def tmats_no_int(radii, epsilon, lmax, k0, helicity):
     """
@@ -337,8 +353,10 @@ def tmats_no_int(radii, epsilon, lmax, k0, helicity):
     num = radii.shape[0]
     sphere_ = sphere_parity(lmax, k0, radii[0], epsilon[0])
     shape = sphere_.shape[0]
+
     def create_sphere(rad, eps):
-        return sphere_parity(lmax, k0, rad, eps)   
+        return sphere_parity(lmax, k0, rad, eps)
+
     matrices = jax.vmap(create_sphere, in_axes=(0, 0))(radii, epsilon)
     tlocal = block_diag(*matrices)
     if helicity:
@@ -347,8 +365,9 @@ def tmats_no_int(radii, epsilon, lmax, k0, helicity):
         tlocal = mat.T @ tlocal @ mat
     return tlocal
 
+
 #   @partial(jit, static_argnums=(2, 4))
-def tmats_interact(ts, positions, modes, k0, helicity, epsilon, mu=1, kappa=0):   
+def tmats_interact(ts, positions, modes, k0, helicity, epsilon, mu=1, kappa=0):
     """
     Dress local T-matrices with multiple-scattering interactions.
 
@@ -360,20 +379,33 @@ def tmats_interact(ts, positions, modes, k0, helicity, epsilon, mu=1, kappa=0):
         modes (tuple): Mode indices as returned by defaultmodes(lmax, num).
         k0 (float): Vacuum wavenumber.
         helicity (bool): Helicity basis flag.
-        epsilon (array-like): Medium permittivity information. 
+        epsilon (array-like): Medium permittivity information.
         mu, kappa: Magnetic and chiral parameters for the medium.
 
     Returns:
         ndarray: Full T-matrix including multiple scattering, shape (M, M).
     """
-    translation = sw_expand(positions, modes, k0, helicity, epsilon, mu, kappa, modetype="regular", to_modetype="singular")  
+    translation = sw_expand(
+        positions,
+        modes,
+        k0,
+        helicity,
+        epsilon,
+        mu,
+        kappa,
+        modetype="regular",
+        to_modetype="singular",
+    )
     finalt = np.linalg.solve(
         np.eye(ts.shape[0]) - ts @ np.reshape(translation, ts.shape), ts
     )
     return finalt
 
+
 #   @partial(jit, static_argnums=(2, 4, 5))
-def globfromloc(tlocal, positions, lmax, k0, num, helicity, epsilon, lmax_glob=None, mu=1, kappa=0):
+def globfromloc(
+    tlocal, positions, lmax, k0, num, helicity, epsilon, lmax_glob=None, mu=1, kappa=0
+):
     """
     Convert local, interacting T-matrix to a global T-matrix about the origin.
 
@@ -434,7 +466,7 @@ def globfromloc(tlocal, positions, lmax, k0, num, helicity, epsilon, lmax_glob=N
     positions = origin
     return global_t, modes2, positions
 
-#@partial(jit, static_argnums=(3, 5)) takes ages
+
 def global_tmat(positions, radii, epsilon, lmax, k0, helicity, lmax_glob=None):
     """
     Build the global T-matrix for multiple spheres.

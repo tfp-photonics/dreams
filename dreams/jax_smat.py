@@ -8,22 +8,22 @@ from scipy.special import loggamma
 from treams import pw
 import jax.numpy as np
 from jax import config
-from dreams.jax_la_bounded import  lsumsw2d_shift_vmap 
+from dreams.jax_la_bounded import lsumsw2d_shift_vmap
 from dreams.jax_coeffs import fresnel
 from dreams.jax_op import pw_translate
 from dreams.jax_waves import pi_fun, tau_fun
 from dreams.jax_misc import (
     refractive_index,
-    defaultmodes, 
+    defaultmodes,
     sdefaultmodes,
     wave_vec_z,
-    wigner3j
+    wigner3j,
 )
+
 config.update("jax_enable_x64", True)
 
 
-
-def interface(eps1, eps2, k0, modes,  mu=1, kappa=0):
+def interface(eps1, eps2, k0, modes, mu=1, kappa=0):
     """Planar interface between two media.
 
     Args:
@@ -35,7 +35,7 @@ def interface(eps1, eps2, k0, modes,  mu=1, kappa=0):
     Returns:
         SMatrix
     """
-    
+
     kx = modes[0]
     ky = modes[1]
     pol = modes[2]
@@ -50,11 +50,15 @@ def interface(eps1, eps2, k0, modes,  mu=1, kappa=0):
     if all(kxs[0] == kxs[1]) and all(kys[0] == kys[1]):
         kzs = np.stack(
             [
-                wave_vec_z(kxs[0][:, None], kys[0][:, None], (k0 * refractive_index(e, mu, kappa))[pls] )
+                wave_vec_z(
+                    kxs[0][:, None],
+                    kys[0][:, None],
+                    (k0 * refractive_index(e, mu, kappa))[pls],
+                )
                 for e in eps
             ],
             -2,
-        ) 
+        )
         vals = fresnel(ks, kzs, zs)
         qs = qs.at[:, :, choice, choice].set(np.moveaxis(vals[:, :, :, 0, 0], 0, -1))
         qs = qs.at[:, :, choice, ~choice].set(np.moveaxis(vals[:, :, :, 0, 1], 0, -1))
@@ -65,10 +69,16 @@ def interface(eps1, eps2, k0, modes,  mu=1, kappa=0):
             for ii, (kx2, ky2, pol2) in enumerate(modes):
                 if kx != kx2 or ky != ky2:
                     continue
-                kzs = np.array([wave_vec_z(kx, ky, k0 * refractive_index(e, mu, kappa)[pol] )  for e in eps])
+                kzs = np.array(
+                    [
+                        wave_vec_z(kx, ky, k0 * refractive_index(e, mu, kappa)[pol])
+                        for e in eps
+                    ]
+                )
                 vals = fresnel(ks, kzs, zs)
                 qs = qs.at[:, :, ii, i].set(vals[:, :, pol2, pol])
     return qs
+
 
 def propagation(epsilon, r, k0, modes, mu=1, kappa=0, modetype="up"):
     """S-matrix for the propagation along a distance.
@@ -89,41 +99,42 @@ def propagation(epsilon, r, k0, modes, mu=1, kappa=0, modetype="up"):
     pol = modes[-1]
     ks = k0 * refractive_index(epsilon, mu, kappa)[modes[-1]]
     kzs = wave_vec_z(kx, ky, ks, nondifsum=True) * (2 * (modetype == "up") - 1)
-    where = ( (np.abs(kx[:, None]-kx[None,:])< 1e-14)
-    & (np.abs(ky[:, None]-ky[None,:])< 1e-14)
-    & (np.abs(kzs[:, None]-kzs[None,:])< 1e-14)
-    & (pol[:, None] == pol)
+    where = (
+        (np.abs(kx[:, None] - kx[None, :]) < 1e-14)
+        & (np.abs(ky[:, None] - ky[None, :]) < 1e-14)
+        & (np.abs(kzs[:, None] - kzs[None, :]) < 1e-14)
+        & (pol[:, None] == pol)
     )
     sup = pw_translate(
         kx,
-        ky, 
+        ky,
         kzs,
         r[..., None, None, 0],
         r[..., None, None, 1],
         r[..., None, None, 2],
-        where=where
+        where=where,
     )
-    
+
     sdown = pw_translate(
         kx,
-        ky, 
+        ky,
         -kzs,
         -r[..., None, None, 0],
         -r[..., None, None, 1],
         -r[..., None, None, 2],
-        where=where
-
+        where=where,
     )
     zero = np.zeros_like(sup)
-    res =  np.array(
-        [[sup, zero], [zero, sdown]])
+    res = np.array([[sup, zero], [zero, sdown]])
     return res
+
 
 def stack(items):
     q = items[0]
     for i, _item in enumerate(items[:-1]):
         q = add(q, items[i + 1])
     return q
+
 
 def add(scur, sadd, check_materials=True, check_modes=False):
     """
@@ -210,7 +221,9 @@ def array2dt(
         pidx = anp.zeros_like(l)
         modes = anp.array([pidx, l, m, pol])
     if nondifsum:
-        kpar = firstbrillouin2d(anp.array([kx[0], ky[0]]), la.reciprocal(a), nondifsum=nondifsum)
+        kpar = firstbrillouin2d(
+            anp.array([kx[0], ky[0]]), la.reciprocal(a), nondifsum=nondifsum
+        )
         kpar = anp.reshape(kpar, (-1, 2))
         ks = anp.sqrt(
             kx.flatten()[:2] * kx.flatten()[:2]
@@ -229,7 +242,7 @@ def array2dt(
         latticecoupling(
             ks, kpar, a, positions, modes, helicity, t, eta, nondifsum=nondifsum
         ),
-        t
+        t,
     )
 
     if origin is None:
@@ -239,13 +252,21 @@ def array2dt(
     tout = pw_translate(
         kx[:, None],
         ky[:, None],
-        kz[:, None],        
+        kz[:, None],
         -posdiff[pidx, 0],
         -posdiff[pidx, 1],
         -posdiff[pidx, 2],
     )
     ain = illuminate_pw(
-        kx, ky, kz, anp.array(pwpol), anp.array(pidx), helicity, positions, modes, nondifsum
+        kx,
+        ky,
+        kz,
+        anp.array(pwpol),
+        anp.array(pidx),
+        helicity,
+        positions,
+        modes,
+        nondifsum,
     )
     pout = periodic_to_pw(
         kx[:, None],
@@ -255,11 +276,12 @@ def array2dt(
         *modes[1:],
         la.area(a),
         helicity=helicity,
-        nondifsum=nondifsum
+        nondifsum=nondifsum,
     )
-    sca = (tout * pout)
+    sca = tout * pout
     ans = sca @ interaction @ ain
     return ans
+
 
 def _check_modes(modes):
     """_check_modes"""
@@ -277,7 +299,9 @@ def _check_modes(modes):
     return modes
 
 
-def periodic_to_pw(kx, ky, kz, pol, l, m, qol, area, posout=0, posin=0, helicity=True, nondifsum=False):
+def periodic_to_pw(
+    kx, ky, kz, pol, l, m, qol, area, posout=0, posin=0, helicity=True, nondifsum=False
+):
     """
     periodic_to_pw(kx, ky, kz, pol, l, m, qol, area, posout=0, posin=0, helicity=True)
 
@@ -329,7 +353,7 @@ def periodic_to_pw(kx, ky, kz, pol, l, m, qol, area, posout=0, posin=0, helicity
             area,
             posout,
             posin,
-            nondifsum
+            nondifsum,
         )
     return _periodic_to_pw_p(
         kx,
@@ -342,12 +366,13 @@ def periodic_to_pw(kx, ky, kz, pol, l, m, qol, area, posout=0, posin=0, helicity
         area,
         posout,
         posin,
-        nondifsum
+        nondifsum,
     )
 
 
-
-def _periodic_to_pw_h(kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nondifsum=False):
+def _periodic_to_pw_h(
+    kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nondifsum=False
+):
     if nondifsum:
         k = anp.sqrt(kx * kx + ky * ky + kz * kz)
         phi = arctan2(ky, kx)
@@ -355,7 +380,7 @@ def _periodic_to_pw_h(kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nond
         k = np.sqrt(kx * kx + ky * ky + kz * kz)
         phi = np.arctan2(ky, kx)
     costheta = kz / k
-    
+
     kz_s = kz
 
     conds = [
@@ -365,7 +390,7 @@ def _periodic_to_pw_h(kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nond
     choices = [1e-20 + 1e-20j, -kz_s]
     kz_s = np.select(conds, choices, kz_s)
     if nondifsum:
-        
+
         ans0 = (
             sqrt(pi * (2 * l + 1) / (l * (l + 1)))
             * anp.exp((loggamma(l - m + 1) - loggamma(l + m + 1)) * 0.5)
@@ -383,17 +408,16 @@ def _periodic_to_pw_h(kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nond
             * anp.exp((loggamma(l - m + 1) - loggamma(l + m + 1)) * 0.5)
             * np.exp(1j * m * phi)
             * pow(-1j, l)
-            * (
-                tau_fun(l, m, costheta)
-                + (2 * polpw - 1) * pi_fun(l, m, costheta)
-            )
+            * (tau_fun(l, m, costheta) + (2 * polpw - 1) * pi_fun(l, m, costheta))
             / (area * k * kz_s)
-        )        
+        )
     answer = np.where(polvsw != polpw, 0.0j, ans0)
     return answer
 
 
-def _periodic_to_pw_p(kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nondifsum=False):
+def _periodic_to_pw_p(
+    kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nondifsum=False
+):
     if nondifsum:
         k = anp.sqrt(kx * kx + ky * ky + kz * kz)
     else:
@@ -425,6 +449,7 @@ def _periodic_to_pw_p(kx, ky, kz, polpw, l, m, polvsw, area, posout, posin, nond
     )
 
     return answer
+
 
 def to_sw(l, m, polsw, kx, ky, kz, polpw, poltype=None, *args, **kwargs):
     """to_sw(l, m, polsw, kx, ky, kz, polpw, helicity=True)
@@ -461,38 +486,45 @@ def to_sw(l, m, polsw, kx, ky, kz, polpw, poltype=None, *args, **kwargs):
 
 def to_sw_p(l, m, polvsw, kx, ky, kz, polpw):
     kxy = sqrt(kx * kx + ky * ky)
-    pref = np.where(kxy == 0, 1,  np.power((kx - 1j * ky) / kxy, m))
+    pref = np.where(kxy == 0, 1, np.power((kx - 1j * ky) / kxy, m))
     k = np.sqrt(kx * kx + ky * ky + kz * kz)
     costheta = kz / k
     pref = pref * (
-        2 * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
+        2
+        * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
         * np.exp(0.5 * (loggamma(l - m + 1) - loggamma(l + m + 1)))
         * np.power(1j, l)
     )
-    return np.where(polvsw == polpw, pref * treams.special.tau_fun(l, m, costheta),
-                        pref * pi_fun(l, m, costheta)
-                        )
-
+    return np.where(
+        polvsw == polpw,
+        pref * treams.special.tau_fun(l, m, costheta),
+        pref * pi_fun(l, m, costheta),
+    )
 
 
 def to_sw_h(l, m, polvsw, kx, ky, kz, polpw):
     kxy = np.sqrt(kx * kx + ky * ky)
-    pref = np.where(kxy == 0, 1,  np.power((kx - 1j * ky) / kxy, m))
+    pref = np.where(kxy == 0, 1, np.power((kx - 1j * ky) / kxy, m))
+
     def inner_fun():
         k = np.sqrt(kx * kx + ky * ky + kz * kz)
         costheta = kz / k
         return (
-            2 * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
+            2
+            * np.sqrt(np.pi * (2 * l + 1) / (l * (l + 1)))
             * np.exp(0.5 * (loggamma(l - m + 1) - loggamma(l + m + 1)))
             * np.power(1j, l)
             * pref
-        ) * (treams.special.tau_fun(l, m, costheta) + (2 * polpw - 1) * pi_fun(l, m, costheta))
+        ) * (
+            treams.special.tau_fun(l, m, costheta)
+            + (2 * polpw - 1) * pi_fun(l, m, costheta)
+        )
 
     ans = np.where(polvsw != polpw, 0.0j, inner_fun())
     return ans
 
 
-def illuminate_pw(kx, ky, kz, pol, pidx, helicity, positions, modes, nondif = True):
+def illuminate_pw(kx, ky, kz, pol, pidx, helicity, positions, modes, nondif=True):
     """
     Illuminate with a plane wave
 
@@ -514,13 +546,14 @@ def illuminate_pw(kx, ky, kz, pol, pidx, helicity, positions, modes, nondif = Tr
             *(m[:, None] for m in modes[1:]), kx, ky, kz, pol, poltype=poltype
         )
         pwtr = pw_translate(kx, ky, kz, *pos)
-        res =  pwsw * pwtr
+        res = pwsw * pwtr
 
     else:
         res = to_sw(
             *(m[:, None] for m in modes[1:]), kx, ky, kz, pol, poltype=poltype
         ) * pw_translate(kx, ky, kz, *pos)
     return res
+
 
 def firstbrillouin2d(kpar, b, n=2, nondifsum=False):
     """
@@ -558,7 +591,7 @@ def firstbrillouin2d(kpar, b, n=2, nondifsum=False):
         kpar = kpar - b2 * anp.round((kpar @ b2) / normsq2)
     else:
         kpar = kpar - b1 * np.round((kpar @ b1) / normsq1)
-        kpar = kpar - b2 * np.round((kpar @ b2) / normsq2)        
+        kpar = kpar - b2 * np.round((kpar @ b2) / normsq2)
     options = kpar + la.cube(2, 1) @ b
     for _i, option in enumerate(options):
         if nondifsum:
@@ -606,8 +639,6 @@ def latticecoupling(
     )
     ans = np.eye(t.shape[0]) - t @ m
     return ans
-
-
 
 
 def translate_periodic(
@@ -673,9 +704,8 @@ def translate_periodic(
         kpar = anp.array(kpar)
         rsin = anp.array(rsin)
     else:
-        ks = np.where((ks.shape[0] == 2) & (ks[0, 0] == ks[1, 0]),
-                          ks[:1, :], ks)
-    
+        ks = np.where((ks.shape[0] == 2) & (ks[0, 0] == ks[1, 0]), ks[:1, :], ks)
+
         kpar = np.array(kpar)
         rsin = np.array(rsin)
 
@@ -687,7 +717,7 @@ def translate_periodic(
     rsdiff = -rs[:, None, None, None, :] + rsin[:, None, None, :]
     if kpar.ndim == 0 or kpar.shape[-1] == 1:
         dlms = la.lsumsw1d_shift(modes[:, 0], modes[:, 1], ks, kpar, a, rsdiff, eta)
-    elif kpar.shape[-1] == 2: 
+    elif kpar.shape[-1] == 2:
         if nondifsum == True:
             dlms = la.lsumsw2d_shift(modes[:, 0], modes[:, 1], ks, kpar, a, rsdiff, eta)
         else:
@@ -706,8 +736,7 @@ def translate_periodic(
                 dlms[out[0][:, None], in_[0], ks.shape[0] - 1, :],
             )
 
-            return ans_h #.flatten()[0].real
-
+            return ans_h 
         ans_p = translate_periodic_p(
             *(o[:, None] for o in out[1:]),
             *in_[1:],
@@ -770,7 +799,9 @@ def _transl_A_lattice(lambda_, mu, l, m, dlms):
 
     for _ in range(
         0,
-        anp.max((l + lambda_) - (anp.maximum(anp.abs(lambda_ - l), anp.abs(m - mu)) - 1)),
+        anp.max(
+            (l + lambda_) - (anp.maximum(anp.abs(lambda_ - l), anp.abs(m - mu)) - 1)
+        ),
         2,
     ):
         i, j = np.ogrid[: len(dlms), : len(dlms)]
@@ -778,7 +809,7 @@ def _transl_A_lattice(lambda_, mu, l, m, dlms):
         res = res + (
             dlm
             * anp.power(1.0j, p)
-            * (2 * p + 1 +0.j)**0.5
+            * (2 * p + 1 + 0.0j) ** 0.5
             * wigner3j(l, lambda_, p, m, -mu, -m + mu)
             * wigner3j(l, lambda_, p, 0, 0, 0)
             * (l * (l + 1) + lambda_ * (lambda_ + 1) - p * (p + 1))
@@ -806,14 +837,16 @@ def _transl_B_lattice(lambda_, mu, l, m, dlms):
 
     for _ in range(
         0,
-        anp.max((lambda_ + l - 1) - (anp.maximum(abs(lambda_ - l) + 1, anp.abs(m - mu)) - 1)),
+        anp.max(
+            (lambda_ + l - 1) - (anp.maximum(abs(lambda_ - l) + 1, anp.abs(m - mu)) - 1)
+        ),
         2,
     ):
         dlm = dlms[i, j, (p * (p + 1) + m - mu)]
         res = res + (
             dlm
             * anp.power(1.0j, p)
-            * (2 * p + 1 +0.j)**0.5
+            * (2 * p + 1 + 0.0j) ** 0.5
             * wigner3j(l, lambda_, p, m, -mu, -m + mu)
             * wigner3j(l, lambda_, p - 1, 0, 0, 0)
             * anp.sqrt(
@@ -887,9 +920,9 @@ def arrayt(
             positions=positions,
             nondifsum=nondifsum,
         )
-        
-        dim = int(res.shape[0]/2)
-        dim2 = int(res.shape[1]/2)
+
+        dim = int(res.shape[0] / 2)
+        dim2 = int(res.shape[1] / 2)
         q00 = res[0:dim, 0:dim2] + np.eye(dim, dim2)
         q01 = res[0:dim, dim2 : 2 * dim2]
         q10 = res[dim : 2 * dim, 0:dim2]

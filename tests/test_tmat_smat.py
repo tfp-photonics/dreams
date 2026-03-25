@@ -76,16 +76,6 @@ def s_matrix_local_jax(cfg):
     )
     
     return s_matrix
-    
-    a = np.array([[cfg.lat, 0],[0, cfg.lat]])
-    b = treams.lattice.reciprocal(a)
-    kvec = np.array([cfg.kx, cfg.ky])+ treams.lattice.diffr_orders_circle(b, rmax=cfg.rmax_coef * cfg.k0) @ b
-    pwb = default_plane_wave(kvec)
-    lattice = treams.Lattice.square(cfg.lat)
-    kpar = [cfg.kx, cfg.ky]
-    pwb = treams.PlaneWaveBasisByComp.diffr_orders(kpar, lattice, cfg.rmax_coef * cfg.k0)
-    illu = np.array(treams.plane_wave(kpar, 0, k0=cfg.k0, basis=pwb, material=cfg.eps_bg)) 
-    return tr(s_matrix, cfg.k0, cfg.lat, cfg.helicity, illu, pwb)[0]
 
 def s_matrix_global_jax(cfg):
     pos, radii, epsilons = prepare(cfg) 
@@ -220,7 +210,7 @@ def compare(cfg, f1, f2, rtol=1e-12, atol=1e-14):
     np.save("v2.npy", onp.array(v2))
 
     time2 = time.time() - (start + time1)
-    print(time2)
+    print("timing", time2)
     v1 = onp.array(v1)
     v2 = onp.asarray(v2, dtype=onp.complex128)
     rel_err = onp.linalg.norm(v1 - v2) / max(onp.linalg.norm(v2), 1.0)
@@ -300,13 +290,6 @@ def test_s_mat_global():
     times = onp.array(times)
     errors = onp.array(errors)
     print('times', times, 'errors', errors)
-
-
-def test_t_mat_parity():
-    cfg = config()
-    cfg.lmax = 3
-    cfg.helicity = False
-    compare(cfg, t_matrix_cluster_jax, t_matrix_cluster_treams,  rtol=1e-12, atol=1e-14 )
 
 
 if __name__ == "__main__":

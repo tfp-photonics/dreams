@@ -21,6 +21,21 @@ def minusonepow(l):
     return anp.where(l % 2 == 0, 1, -1)
 
 
+def minusonepow_dif(l):
+    r"""(-1) raised to an integer power.
+
+    Computes :math:`(-1)^l` for integer-like input.
+
+    Args:
+        l (array_like of int): Exponent(s).
+
+    Returns:
+        ndarray: Values in ``{-1, +1}`` with the same shape as ``l``.
+    """
+    l = np.asarray(l)
+    return np.where(l % 2 == 0, 1, -1)
+
+
 def defaultmodes(lmax, nmax=1):
     """
     Default sortation of modes
@@ -47,6 +62,7 @@ def defaultmodes(lmax, nmax=1):
         ).T,
     )
 
+
 #  @partial(jit, static_argnums = (0,))
 def sdefaultmodes(kpars, nondifsum=True):
     """
@@ -71,12 +87,13 @@ def sdefaultmodes(kpars, nondifsum=True):
         pols = anp.where(anp.arange(len(pols)) % 2, 0, 1)
 
     else:
-        kpars = kpars.reshape(-1, 2) 
+        kpars = kpars.reshape(-1, 2)
         res = np.repeat(kpars, axis=0, repeats=2)
         pols = np.empty(2 * kpars.shape[0], int)
         pols = anp.where(anp.arange(len(pols)) % 2, 0, 1)
 
     return (*res.T, pols)
+
 
 def defaultlmax(dim, nmax=1):
     """
@@ -118,7 +135,6 @@ def defaultdim(lmax, nmax=1):
     return 2 * lmax * (lmax + 2) * nmax
 
 
-
 def refractive_index(epsilon=1, mu=1, kappa=0):
     r"""
     Refractive index of a (chiral) medium
@@ -148,6 +164,7 @@ def refractive_index(epsilon=1, mu=1, kappa=0):
         res = np.where(anp.imag(res) < 0, -res, res)
     return res
 
+
 def basischange(out, in_=None):
     """
     Coefficients for the basis change between helicity and parity modes
@@ -174,6 +191,7 @@ def basischange(out, in_=None):
     res[anp.logical_and(equal, minus)] = -sqhalf
     return res
 
+
 def wave_vec_z(kx, ky, k, nondifsum=True):
     r"""
     Z component of the wave vector with positive imaginary part
@@ -199,7 +217,7 @@ def wave_vec_z(kx, ky, k, nondifsum=True):
         elif res.ndim > 0:
             res = -res * (anp.imag(res) < 0) + res * (anp.imag(res) >= 0)
         return res
-    
+
     else:
         ksq = (k * k - kx * kx - ky * ky).astype(complex)
         res = np.sqrt(ksq)
@@ -228,24 +246,25 @@ def wigner3j(l1, l2, l3, m1, m2, m3):
         :math:`\left(\begin{smallmatrix}
         l_1 & l_2 & l_3 \\ m_1 & m_2 & m_3
         \end{smallmatrix}\right)`.
-    """ 
+    """
     array = anp.zeros(l3.shape)
     l1 = l1 + anp.zeros_like(l3)
     l2 = l2 + anp.zeros_like(l3)
     m1 = m1 + anp.zeros_like(l3)
     m2 = m2 + anp.zeros_like(l3)
     m3 = m3 + anp.zeros_like(l3)
-    arg = ( (l1>=0) & (l2>=0) & (l3>=0) )
-    arg =  np.nonzero((l1>=0) & (l2>=0) & (l3>=0) )
+    arg = (l1 >= 0) & (l2 >= 0) & (l3 >= 0)
+    arg = np.nonzero((l1 >= 0) & (l2 >= 0) & (l3 >= 0))
 
     if len(arg) != 0:
-        array[arg] = anp.vectorize(cs.wigner3j, otypes=[anp.complex128])(l1[arg], l2[arg], l3[arg], m1[arg], m2[arg], m3[arg])
+        array[arg] = anp.vectorize(cs.wigner3j, otypes=[anp.complex128])(
+            l1[arg], l2[arg], l3[arg], m1[arg], m2[arg], m3[arg]
+        )
     return array
 
 
-
 def diffr_orders_circle(b, rmax):
-    """    
+    """
     Diffraction orders inside a circular cutoff.
 
     Given a 2D reciprocal lattice with row vectors :math:`\mathbf{b}_0` and

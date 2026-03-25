@@ -1,28 +1,15 @@
+import time
+
+import h5py
+import jax
 import jax.numpy as np
-import numpy as anp
 import matplotlib.pyplot as plt
 import nlopt
-import scipy
-import scipy.io
-import h5py
+import numpy as anp
 import treams
-import jax
-from jax import value_and_grad, grad, jit
-from jax.test_util import check_grads
+from func_helper import field_wl_treams, fob, fob_treams, multipole_xs_treams
+from jax import jit, value_and_grad
 
-from dreams.jax_smat import _check_modes
-from dreams.jax_tmat import (
-    defaultmodes,
-    refractive_index,
-    tmats_interact,
-    tmats_no_int,
-    sphere_parity,
-)
-from dreams.jax_op import _sw_pw_expand
-from dreams.jax_tr import smat_spheres, tr
-from dreams.jax_waves import efield
-from treams._core import SphericalWaveBasis as SWB
-from func_helper import fob, xs_treams, fob_treams, field_wl_treams, multipole_xs_treams
 
 # constraint should be differentiable
 def overlap(pos, radii):
@@ -36,11 +23,12 @@ def overlap(pos, radii):
     answer = np.max(rd - dmat)
     return answer
 
+
 def nlopt_constraint(params, gd):
     v, g = value_and_grad(
         lambda params: overlap(
-            params[: 3 * len(params)//4].reshape(-1, 3),
-            params[3 * len(params)//4:],
+            params[: 3 * len(params) // 4].reshape(-1, 3),
+            params[3 * len(params) // 4 :],
         )
     )(params)
     if gd.size > 0:
@@ -54,14 +42,15 @@ def optimizer(p, n_steps):
         nlopt.LD_MMA,
         p.flatten().shape[0],
     )  # or e.g. nlopt.LD_LBFGS
-    #v_g = jit(value_and_grad(fob)) not worth it
-    v_g = value_and_grad(fob)
+    v_g = jit(jax.value_and_grad(lambda params: fob(params, cfg)))
     index = 0
+
     def nlopt_objective(params, gd):
         nonlocal index
-        print(f"evaluating objective function: {index}")
+        if index % 10 == 0:
+            print(f"evaluating objective function: {index}")
         index += 1
-        v, g = v_g(params, cfg)
+        v, g = v_g(params)
         if gd.size > 0:
             gd[:] = g.ravel()
         v = anp.array(v)
@@ -69,7 +58,7 @@ def optimizer(p, n_steps):
         pas.append(params)
         return v.item()
 
-    opt.set_max_objective(nlopt_objective)  
+    opt.set_max_objective(nlopt_objective)
     opt.add_inequality_constraint(nlopt_constraint, 1e-8)
 
     bound = [-float("inf")] * p.shape[0]
@@ -79,6 +68,8 @@ def optimizer(p, n_steps):
     opt.set_maxeval(n_steps)  # maximum number of function evaluations
     p_opt = opt.optimize(p)
     pas.append(p_opt)
+    return v_g
+
 
 # parameter definitions
 
@@ -91,11 +82,11 @@ else:
 treams.config.POLTYPE = poltype
 
 n_steps = 100
-wavelengths = np.arange(400.0, 1001, 5.0) #range includes exact point of evaliation
+wavelengths = np.arange(400.0, 1001, 5.0)  # range includes exact point of evaliation
 k0s = 2 * np.pi / wavelengths
 num = 6
 eps_emb = 1
-eps_obj = 2.5 ** 2
+eps_obj = 2.5**2
 epsilons = np.tile(np.array([eps_obj, eps_emb]), (num, 1))
 pol = [0, 1, 0]
 Sgn = 1
@@ -119,17 +110,19 @@ dteta = (tetamax - tetamin) / float(Nteta - 1)
 dphi = (phimax - phimin) / float(Nphi)
 r = 100000
 
-tetalist = anp.ones((int(Nteta), int(Nphi))) * anp.linspace(
-    tetamin, tetamax, int(Nteta)
-)[:, None]
-philist = anp.ones((int(Nteta), int(Nphi))) * anp.linspace(
-    phimin, phimax, int(Nphi), endpoint=False
-)[None, :]
+tetalist = (
+    anp.ones((int(Nteta), int(Nphi)))
+    * anp.linspace(tetamin, tetamax, int(Nteta))[:, None]
+)
+philist = (
+    anp.ones((int(Nteta), int(Nphi)))
+    * anp.linspace(phimin, phimax, int(Nphi), endpoint=False)[None, :]
+)
 
 xff = (r * anp.sin(tetalist) * anp.cos(philist)).flatten()
 yff = (r * anp.sin(tetalist) * anp.sin(philist)).flatten()
 zff = (r * anp.cos(tetalist)).flatten()
-d_solid_surf = (r ** 2 * anp.sin(tetalist) * dteta * dphi)
+d_solid_surf = r**2 * anp.sin(tetalist) * dteta * dphi
 
 grid_f = anp.transpose(anp.array([xff, yff, zff]))
 grid_b = -grid_f
@@ -141,7 +134,7 @@ y = R * np.sin(ni * np.pi / 180)
 z = np.zeros_like(x)
 positions = np.array([x, y, z]).T
 radii = np.ones(num) * radius
-rl = 2.0
+rl = 5.0
 va = []
 pas = []
 pos = positions.flatten()
@@ -156,7 +149,7 @@ cfg = {
     "lmax_glob": lmax_glob,
     "eps_emb": eps_emb,
     "eps_obj": eps_obj,
-    "epsilons": epsilons,   
+    "epsilons": epsilons,
     "wavelengths": wavelengths,
     "pol": tuple(pol),
     "Sgn": Sgn,
@@ -171,43 +164,40 @@ cfg = {
 param = np.append(pos, radii)
 name = (
     f"paper_results/num-{num}-parity-R-{R}-local-pos-rad-{wl1}-lmax-{lmax}"
-    f"-pol-{pol[0]}-nsteps-{n_steps}-rad-{radius}-nph-{Nphi}-nth-{Nteta}"
+    f"-pol-{pol[0]}-nsteps-{n_steps}-rad-{radius}-rl-{rl}-nph-{Nphi}-nth-{Nteta}"
 )
 
 vfi, vbi = field_wl_treams(anp.array(param), cfg)
 
-fob_init_treams, sum_init_treams, tmats_init = fob_treams(anp.array(param), cfg)
+forward_init_treams, backward_init_treams, tmats_init = fob_treams(
+    anp.array(param), cfg
+)
+fob_init_treams = forward_init_treams / backward_init_treams
+sum_init_treams = forward_init_treams + backward_init_treams
+
 xss_init = multipole_xs_treams(tmats_init, cfg)
-
-optimizer(param, n_steps)
-va.append(fob(pas[-1], cfg))
-
+t0 = time.perf_counter()
+v_g = optimizer(param, n_steps)  #  includes first JAX compile
+t1 = time.perf_counter()
+time_full = t1 - t0
+print("end_to_end_optimization =", time_full)
+v_final, g_final = v_g(jax.numpy.asarray(pas[-1]))
+va.append(float(v_final))
 # postprocess
-fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(17, 17))
+forward_final_treams, backward_final_treams, tmats_final = fob_treams(
+    anp.array(pas[-1]), cfg
+)
 
-ax3.scatter(wavelengths, fob_init_treams, color="g", label="Initial f/b treams")
-
-fob_final_treams, sum_final_treams, tmats_final = fob_treams(anp.array(pas[-1]), cfg)
+fob_final_treams = forward_final_treams / backward_final_treams
+sum_final_treams = forward_final_treams + backward_final_treams
 xss_final = multipole_xs_treams(tmats_final, cfg)
-
-ax3.scatter(wavelengths, fob_final_treams, color="r", label="Final f/b")
-ax3.set_ylabel("f/b")
-ax3.set_xlabel(r"$\lambda$ (nm)")
-
-ax4.set_xlabel(r"$\lambda$ (nm)")
-ax4.scatter(wavelengths, sum_init_treams, color="g", label="Initial f+b treams")
-ax4.scatter(wavelengths, sum_final_treams, color="r", label="Final f+b")
-ax4.set_ylabel("f+b")
-
-ax3.legend()
-ax1.scatter(range(len(va)), va)
 
 posf = pas[-1][: int(3.0 / 4.0 * len(pas[-1]))].reshape((-1, 3))
 radf = pas[-1][int(3.0 / 4.0 * len(pas[-1])) :]
 
 vff, vbf = field_wl_treams(pas[-1], cfg)
 
-with open(__file__, "r") as file:
+with open(__file__) as file:
     script = file.read()
 
 with h5py.File(f"{name}.h5", "w") as f:
@@ -232,6 +222,10 @@ with h5py.File(f"{name}.h5", "w") as f:
     f["eps_obj"] = eps_obj
     f["fob_init"] = fob_init_treams
     f["fob_final"] = fob_final_treams
+    f["fwd_init"] = forward_init_treams
+    f["fwd_final"] = forward_final_treams
+    f["bwd_init"] = backward_init_treams
+    f["bwd_final"] = backward_final_treams
     f["sum_init"] = sum_init_treams
     f["sum_final"] = sum_final_treams
     f["tmats_init"] = tmats_init
@@ -244,3 +238,4 @@ with h5py.File(f"{name}.h5", "w") as f:
     f["nteta"] = Nteta
     f["nphi"] = Nphi
     f["r"] = r
+    f["time"] = time_full
