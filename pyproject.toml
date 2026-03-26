@@ -6,7 +6,8 @@ requires = ["flit_core >=3.2,<4"]
 
 [project]
 authors = [
-  {name = "Nigar Asadova and Jan David Fischbach", email = "nigar.asadova@kit.edu"}
+  {name = "Nigar Asadova", email = "nigar.asadova@kit.edu"},
+  {name = "Jan David Fischbach"}
 ]
 classifiers = [
   "Programming Language :: Python :: 3.9",
@@ -19,10 +20,9 @@ dependencies = [
   "treams",
   "jax",
   "nlopt",
-  "line-profiler>=4.2.0",
   "equinox>=0.11.10",
 ]
-description = "Make differentiable `treams` come true"
+description = "Differentiable T-matrix based electromagnetic scattering framework."
 keywords = ["python"]
 license = {file = "LICENSE"}
 name = "dreams"
@@ -36,7 +36,8 @@ dev = [
   "pytest",
   "pytest-cov",
   "pytest-regressions",
-  "pandas"
+  "pandas",
+  "line-profiler>=4.2.0",
 ]
 docs = [
   "jupytext",
@@ -107,19 +108,13 @@ select = [
 [tool.ruff.pydocstyle]
 convention = "google"
 
-[tool.setuptools.package-data]
-mypkg = ["*.csv", "*.yaml"]
-
-[tool.setuptools.packages]
-find = {}
-
 [tool.towncrier]
 directory = ".changelog.d"
 filename = "CHANGELOG.md"
-issue_format = "[#{issue}](https://github.com/opteng/dreams/issues/{issue})"
+issue_format = "[#{issue}](https://github.com/tfp-photonics/dreams/issues/{issue})"
 start_string = "<!-- towncrier release notes start -->\n"
 template = ".changelog.d/changelog_template.jinja"
-title_format = "## [{version}]https://github.com/opteng/dreams/releases/tag/v{version}) - {project_date}"
+title_format = "## [{version}](https://github.com/tfp-photonics/dreams/releases/tag/v{version}) - {project_date}"
 underlines = ["", "", ""]
 
 [[tool.towncrier.type]]

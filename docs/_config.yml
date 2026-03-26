@@ -1,17 +1,19 @@
 # Book settings
 # Learn more at https://jupyterbook.org/customize/config.html
 
-title: autoscat
+title: dreams
 author: Nigar Asadova and Jan David Fischbach
+
+only_build_toc_files: true
 
 # Force re-execution of notebooks on each build.
 # See https://jupyterbook.org/content/execute.html
 execute:
-  execute_notebooks: cache
+  #execute_notebooks: cache
   timeout: -1
   allow_errors: false
   # execute_notebooks: force
-  # execute_notebooks: "off"
+  execute_notebooks: "off"
   # exclude_patterns:
   #   - '*notebooks/devsim/01_pin_waveguide*'
 
@@ -26,11 +28,11 @@ html:
   use_edit_page_button: true
   use_repository_button: true
   use_issues_button: true
-  baseurl: https://github.com/jan-david-fischbach/autoscat
+#  baseurl: https://github.com/tfp-photonics/dreams
 
 # Information about where the book exists on the web
 repository:
-  url: https://github.com/jan-david-fischbach/autoscat
+  url: https://github.com/tfp-photonics/dreams
   path_to_book: docs # Optional path to your book, relative to the repository root
   branch: main # Which branch of the repository should be used when creating links (optional)
 

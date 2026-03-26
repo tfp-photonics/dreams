@@ -44,6 +44,36 @@ def _place_Tl(T, Tl, l, lmax):
 def core_shell_sphere(
     lmax: int, k0: float, radii, epsilon, mu=None, kappa=None, poltype="helicity"
 ):
+    """T-matrix of a multilayered sphere.
+
+    Construct the T-matrix of a homogeneous sphere or a concentric multilayered
+    sphere of the given multipole order. The sphere may consist of multiple
+    spherical shells with arbitrary material parameters.
+
+    The radii are specified from the inside to the outside. The material
+    parameters are likewise ordered from the innermost region to the embedding
+    medium, so that the last entry corresponds to the surrounding medium.
+
+    Args:
+        lmax (int): Maximum multipole order of the T-matrix.
+        k0 (float): Vacuum wavenumber.
+        radii (float or array-like): Radii from inside to outside. For a simple
+            sphere, this can be a single radius. For a multilayered sphere, this
+            should contain the radii of all concentric shells in increasing order.
+        epsilon (array-like): Relative permittivities of all layers and the
+            embedding medium. Its length must be ``len(radii) + 1``.
+        mu (array-like, optional): Relative permeabilities of all layers and the
+            embedding medium. If None, all values are set to 1.
+        kappa (array-like, optional): Chirality parameters of all layers and the
+            embedding medium. If None, all values are set to 0.
+        poltype (str, optional): Polarization basis of the returned T-matrix.
+            Supported values are ``"helicity"`` and ``"parity"``. Defaults to
+            ``"helicity"``.
+
+    Returns:
+        ndarray: T-matrix of shape ``(N, N)``, where
+        ``N = 2 * lmax * (lmax + 2)``.
+    """
     if mu is None:
         mu = np.ones_like(epsilon)
     if kappa is None:

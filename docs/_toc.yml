@@ -4,11 +4,11 @@
 format: jb-book
 root: index
 parts:
-  # - caption: Tutorial
-  #   chapters:
-  #     - file: tutorial
-  #       sections:
-  #         - file: notebooks/demo
+  - caption: Tutorial
+    chapters:
+      - file: examples/cluster_spheres_field
+        title: Cluster of spheres tutorial
+
   - caption: Reference
     chapters:
       - file: api

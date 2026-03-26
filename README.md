@@ -1,15 +1,36 @@
-# dreams 0.1.0
+# dreams 
 
-Make differentiable `treams` come true.
-Automatic Differentiation for multi scattering problems.
+A differentiable T-matrix-based framework for
+multiple-scattering problems in nanophotonics.
 
-## Usage
-
-Use in conjunction with [jax](https://github.com/google/jax) to differentiate through [treams](https://github.com/tfp-photonics/treams.git).
-See the [cluster of spheres optimization example](docs/examples/cluster_spheres_field.py)
+It implements the T-matrix formalism in
+[jax](https://github.com/google/jax), following the implementation of
+[treams](https://github.com/tfp-photonics/treams).
 
 ## Installation
 
+To install the package with pip, use
+
 ```bash
-pip install https://github.com/tfp-photonics/dreams.git
+pip install dreams
 ```
+
+For the development version, clone the repository:
+
+```bash
+git clone https://github.com/tfp-photonics/dreams.git
+cd dreams
+pip install -e ".[dev]"
+```
+
+## Usage
+
+The tutorial is available in the documentation:
+https://tfp-photonics.github.io/dreams/
+
+
+## Features
+
+- inverse design of multiple-scattering systems
+- optimization of scatterer positions and radii
+- support for finite and periodic arrangements
