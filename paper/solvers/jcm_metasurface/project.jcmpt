@@ -1,0 +1,33 @@
+Project {
+  InfoLevel = 3
+
+  Derivatives {
+    Order = 1
+  }
+
+  Electromagnetics {
+    TimeHarmonic {
+      Scattering {
+        Accuracy {
+          FiniteElementDegree = 3
+          Precision = 1e-3
+        }
+      }
+    }
+  }
+}
+
+PostProcess {
+  FourierTransform {
+    FieldBagPath = "./project_results/fieldbag.jcm"
+    NormalDirection = Z
+    OutputFileName = "./project_results/ftZ.jcm"
+  }
+}
+
+PostProcess {
+  ConvertToPowerFlux {
+    InputFileName = "./project_results/ftZ.jcm"
+    OutputFileName = "./project_results/pfZ.jcm"
+  }
+}

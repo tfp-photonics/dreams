@@ -1,0 +1,11 @@
+Material {
+  DomainId = 1
+  RelPermittivity = %(eps_medium)e
+  RelPermeability = 1
+}
+
+Material {
+  DomainId = 2
+  RelPermittivity = %(eps_object)e
+  RelPermeability = 1
+}

@@ -1,0 +1,27 @@
+SourceBag {
+  Source {
+    ElectricFieldStrength {
+      PlaneWave {
+        Lambda0 = %(lambda0)e
+        Incidence = FromAbove
+        ThetaPhi = [%(theta)e %(phi)e]
+        SP = [1 0]
+        PowerFluxScaling = UnitNormal
+      }
+    }
+  }
+}
+
+SourceBag {
+  Source {
+    ElectricFieldStrength {
+      PlaneWave {
+        Lambda0 = %(lambda0)e
+        Incidence = FromAbove
+        ThetaPhi = [%(theta)e %(phi)e]
+        SP = [0 1]
+        PowerFluxScaling = UnitNormal
+      }
+    }
+  }
+}

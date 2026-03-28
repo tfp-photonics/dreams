@@ -1,0 +1,198 @@
+DerivativeParameter {
+  Name = "x1"
+  TreeEntry = Layout3D/Objects/Sphere1/GlobalPosition(1)
+}
+DerivativeParameter {
+  Name = "y1"
+  TreeEntry = Layout3D/Objects/Sphere1/GlobalPosition(2)
+}
+DerivativeParameter {
+  Name = "z1"
+  TreeEntry = Layout3D/Objects/Sphere1/GlobalPosition(3)
+}
+
+DerivativeParameter {
+  Name = "r1"
+  TreeEntry = Layout3D/Objects/Sphere1/Radius
+}
+
+DerivativeParameter {
+  Name = "x2"
+  TreeEntry = Layout3D/Objects/Sphere2/GlobalPosition(1)
+}
+DerivativeParameter {
+  Name = "y2"
+  TreeEntry = Layout3D/Objects/Sphere2/GlobalPosition(2)
+}
+DerivativeParameter {
+  Name = "z2"
+  TreeEntry = Layout3D/Objects/Sphere2/GlobalPosition(3)
+}
+DerivativeParameter {
+  Name = "r2"
+  TreeEntry = Layout3D/Objects/Sphere2/Radius
+}
+
+DerivativeParameter {
+  Name = "x3"
+  TreeEntry = Layout3D/Objects/Sphere3/GlobalPosition(1)
+}
+DerivativeParameter {
+  Name = "y3"
+  TreeEntry = Layout3D/Objects/Sphere3/GlobalPosition(2)
+}
+DerivativeParameter {
+  Name = "z3"
+  TreeEntry = Layout3D/Objects/Sphere3/GlobalPosition(3)
+}
+DerivativeParameter {
+  Name = "r3"
+  TreeEntry = Layout3D/Objects/Sphere3/Radius
+}
+
+DerivativeParameter {
+  Name = "x4"
+  TreeEntry = Layout3D/Objects/Sphere4/GlobalPosition(1)
+}
+DerivativeParameter {
+  Name = "y4"
+  TreeEntry = Layout3D/Objects/Sphere4/GlobalPosition(2)
+}
+DerivativeParameter {
+  Name = "z4"
+  TreeEntry = Layout3D/Objects/Sphere4/GlobalPosition(3)
+}
+DerivativeParameter {
+  Name = "r4"
+  TreeEntry = Layout3D/Objects/Sphere4/Radius
+}
+
+DerivativeParameter {
+  Name = "x5"
+  TreeEntry = Layout3D/Objects/Sphere5/GlobalPosition(1)
+}
+DerivativeParameter {
+  Name = "y5"
+  TreeEntry = Layout3D/Objects/Sphere5/GlobalPosition(2)
+}
+DerivativeParameter {
+  Name = "z5"
+  TreeEntry = Layout3D/Objects/Sphere5/GlobalPosition(3)
+}
+DerivativeParameter {
+  Name = "r5"
+  TreeEntry = Layout3D/Objects/Sphere5/Radius
+}
+
+Layout3D {
+  Name = "five_spheres_periodic"
+  UnitOfLength = 1e-9
+
+  MeshOptions {
+    MaximumSideLength = %(h_bg)e
+  }
+
+  Extrusion {
+    Objects {
+      Parallelogram {
+        Name = "ComputationalDomain/Background"
+        DomainId = 1
+        Priority = ComputationalDomain
+        Port = Center
+        Width = %(domain_x)e
+        Height = %(domain_y)e
+        Boundary {
+          Class = Periodic
+        }
+      }
+    }
+
+    MultiLayer {
+      LayerInterface {
+        BoundaryClass = Transparent
+        GlobalZ = %(z_min)e
+      }
+
+      Layer {
+        Thickness = %(cell_thickness)e
+        DomainId = 1
+      }
+
+      LayerInterface {
+        BoundaryClass = Transparent
+      }
+    }
+  }
+
+  Objects {
+    Sphere {
+      Name = "Sphere1"
+      GlobalPosition = [%(x1)e %(y1)e %(z1)e]
+      Radius = %(r1)e
+      DomainId = 2
+      MeshOptions {
+        BoundaryMeshConstraint {
+          MaximumSideLength = %(h_sphere)e
+        }
+        MaximumSideLength = %(h_sphere_bulk)e
+      }
+    }
+
+    Sphere {
+      Name = "Sphere2"
+      GlobalPosition = [%(x2)e %(y2)e %(z2)e]
+      Radius = %(r2)e
+      DomainId = 2
+      MeshOptions {
+        BoundaryMeshConstraint {
+          MaximumSideLength = %(h_sphere)e
+        }
+        MaximumSideLength = %(h_sphere_bulk)e
+      }
+    }
+
+    Sphere {
+      Name = "Sphere3"
+      GlobalPosition = [%(x3)e %(y3)e %(z3)e]
+      Radius = %(r3)e
+      DomainId = 2
+      MeshOptions {
+        BoundaryMeshConstraint {
+          MaximumSideLength = %(h_sphere)e
+        }
+        MaximumSideLength = %(h_sphere_bulk)e
+      }
+    }
+
+    Sphere {
+      Name = "Sphere4"
+      GlobalPosition = [%(x4)e %(y4)e %(z4)e]
+      Radius = %(r4)e
+      DomainId = 2
+      MeshOptions {
+        BoundaryMeshConstraint {
+          MaximumSideLength = %(h_sphere)e
+        }
+        MaximumSideLength = %(h_sphere_bulk)e
+      }
+    }
+
+    Sphere {
+      Name = "Sphere5"
+      GlobalPosition = [%(x5)e %(y5)e %(z5)e]
+      Radius = %(r5)e
+      DomainId = 2
+      MeshOptions {
+        BoundaryMeshConstraint {
+          MaximumSideLength = %(h_sphere)e
+        }
+        MaximumSideLength = %(h_sphere_bulk)e
+      }
+    }
+  }
+}
+
+
+
+
+
