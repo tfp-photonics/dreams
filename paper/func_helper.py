@@ -260,6 +260,56 @@ def fob_treams(params, cfg):
     return fwd_trms, bck_trms, tmats
 
 
+def _solve_one_k0(k0, positions, radii, cfg):
+    treams.config.POLTYPE = cfg["poltype"]
+
+    materials = [treams.Material(cfg["eps_obj"]), treams.Material(cfg["eps_emb"])]
+
+    tm_list = [
+        treams.TMatrix.sphere(cfg["lmax"], k0, radius, materials)
+        for radius in radii
+    ]
+
+    tm = treams.TMatrix.cluster(tm_list, positions)
+    tm = tm.interaction.solve()
+
+    inc = treams.plane_wave(
+        [0, 0, cfg["Sgn"] * k0],
+        cfg["pol"],
+        k0=k0,
+        material=tm.material,
+        poltype=cfg["poltype"],
+    )
+
+    sca_tr = tm @ inc.expand(tm.basis)
+
+    Ef = sca_tr.efield(cfg["grid_f"])
+    Eb = sca_tr.efield(cfg["grid_b"])
+
+    domg = cfg["d_solid_surf"].flatten()
+
+    forward = anp.sum(anp.sum(anp.abs(Ef) ** 2, axis=-1) * domg)
+    backward = anp.sum(anp.sum(anp.abs(Eb) ** 2, axis=-1) * domg)
+
+    return forward, backward, tm
+
+
+def fob_treams_parallel(params, cfg, n_jobs=-1):
+    positions, radii = unpack_params(params, cfg)
+    k0s = 2 * anp.pi / cfg["wavelengths"]
+
+    results = Parallel(n_jobs=n_jobs, prefer="processes")(
+        delayed(_solve_one_k0)(k0, positions, radii, cfg)
+        for k0 in k0s
+    )
+
+    fwd_trms, bck_trms, tmats = zip(*results)
+
+    fwd_trms = anp.asarray(fwd_trms)
+    bck_trms = anp.asarray(bck_trms)
+    tmats = list(tmats)
+    return fwd_trms, bck_trms, tmats
+
 def xs_treams(tm, illu, flux=0.5):
     if not tm.material.isreal:
         raise NotImplementedError

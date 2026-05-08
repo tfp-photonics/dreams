@@ -203,10 +203,10 @@ def _plane_wave_partial(
     elif pol == 1:
         pol = np.array([0, 1])
     elif len(pol) == 3:
+        pol = np.asarray(pol)
         modetype = "up" if modetype is None else modetype
         if modetype not in ("up", "down"):
             raise ValueError(f"invalid 'modetype': {modetype}")
-        # kvecs = np.array(basis.kvecs(k0, material, modetype))
         kx = basis[:, 0].real
         ky = basis[:, 1].real
         pol_basis = basis[:, 2].real.astype(int)
@@ -228,7 +228,6 @@ def _plane_wave_partial(
             pol = vpw_A(*kvec, 0, 0, 0, [1, 0]) @ pol
         else:
             raise ValueError(f"invalid 'poltype': {poltype}")
-    # res = np.array([pol[x[2].astype(int)] * (np.abs(np.array(kpar) - x[:2]) < 1e-14).all() for x in basis])#.squeeze()
     pol_idx = basis[:, 2].astype(np.int32)  # (N,)
     pol_factor = np.array(pol)[pol_idx]  # (N,)
     diff = np.abs(basis[:, :2] - kpar) < 1e-14  # (N, 2) bool
@@ -411,6 +410,78 @@ def vsh_X(l, m, theta, phi):
     ans = np.where(mask, np.zeros_like(out), out)
     return ans
 
+def vsw_M_far_amplitude(l, m, theta, phi, k):
+    """Far-field amplitude of outgoing/singular M.
+
+    Returns the coefficient of exp(i k r) / r.
+    """
+    X = vsh_X(l, m, theta, phi)
+
+    phase = (-1j) ** (l + 1)
+    amp = phase / k
+
+    out = np.stack(
+        [
+            X[..., 0] * amp,
+            X[..., 1] * amp,
+            X[..., 2] * amp,
+        ],
+        axis=-1,
+    )
+
+    return out
+
+def vsw_N_far_amplitude(l, m, theta, phi, k):
+    Y = vsh_Y(l, m, theta, phi)
+
+    phase = (-1j) ** (l + 1)
+    amp = 1j * phase / k
+
+    tang_theta = Y[..., 1] * amp
+    tang_phi = Y[..., 2] * amp
+
+    zero = np.zeros_like(tang_theta)
+
+    out = np.stack(
+        [
+            zero,
+            tang_theta,
+            tang_phi,
+        ],
+        axis=-1,
+    )
+
+    return out
+
+
+def vsw_A_far_amplitude(l, m, theta, phi, pol, k):
+    """
+    Far-field amplitude of outgoing helicity VSWF.
+
+    Matches your convention:
+
+        A = (N + sign * M) / sqrt(2)
+
+    where sign = +1 for pol > 0, else -1.
+
+    Returns coefficient of exp(i k r) / r.
+    """
+
+    sign = np.where(pol > 0, 1, -1)
+
+    N_inf = vsw_N_far_amplitude(l, m, theta, phi, k)
+    M_inf = vsw_M_far_amplitude(l, m, theta, phi, k)
+
+    out = np.stack(
+        [
+            M_SQRT1_2 * (N_inf[..., 0] + sign * M_inf[..., 0]),
+            M_SQRT1_2 * (N_inf[..., 1] + sign * M_inf[..., 1]),
+            M_SQRT1_2 * (N_inf[..., 2] + sign * M_inf[..., 2]),
+        ],
+        axis=-1,
+    )
+
+    return out
 
 def vsw_N(l, m, kr, theta, phi):
     """Regular vector spherical wave N"""
@@ -446,11 +517,19 @@ def vsw_rN(l, m, kr, theta, phi):
     """Regular vector spherical wave N"""
     Z = vsh_Z(l, m, theta, phi)
     Y = vsh_Y(l, m, theta, phi)
-    pref = _spherical_jn_div_x(l, kr) + jax.vmap(
-        jax.jacrev(spherical_jn, argnums=1, holomorphic=True), in_axes=(0, 0)
-    )(l, kr + 0.0j)
+    djn = jax.jacrev(spherical_jn, argnums=1, holomorphic=True)
+    
+    deriv = jax.vmap(
+    lambda kr_row: jax.vmap(djn, in_axes=(0, 0))(l, kr_row + 0.0j)
+    )(kr)
+    
+    pref = _spherical_jn_div_x(l, kr) + deriv
+    
     cf = _spherical_jn_div_x(l, kr) * np.sqrt(l * (l + 1))
-    out = np.array([Z[:, 0] * cf, Y[:, 1] * pref, Y[:, 2] * pref]).T
+    out = np.stack(
+        [Z[..., 0] * cf, Y[..., 1] * pref, Y[..., 2] * pref],
+        axis=-1,
+    )
     return out
 
 
@@ -458,7 +537,10 @@ def vsw_rM(l, m, kr, theta, phi):
     """Regular vector spherical wave M"""
     vsh = vsh_X(l, m, theta, phi)
     sh = spherical_jn(l, kr)
-    out = np.array([vsh[:, 0], vsh[:, 1] * sh, vsh[:, 2] * sh]).T
+    out = np.stack(
+        [vsh[..., 0], vsh[..., 1] * sh, vsh[..., 2] * sh],
+        axis=-1,
+    )
     return out
 
 
@@ -467,13 +549,14 @@ def vsw_A(l, m, kr, theta, phi, pol):
     sign = np.where(pol > 0, 1, -1)
     N = vsw_N(l, m, kr, theta, phi)
     M = vsw_M(l, m, kr, theta, phi)
-    out = np.array(
+    out = np.stack(
         [
-            M_SQRT1_2 * (N[:, 0] + sign * M[:, 0]),
-            M_SQRT1_2 * (N[:, 1] + sign * M[:, 1]),
-            M_SQRT1_2 * (N[:, 2] + sign * M[:, 2]),
-        ]
-    ).T
+            M_SQRT1_2 * (N[..., 0] + sign * M[..., 0]),
+            M_SQRT1_2 * (N[..., 1] + sign * M[..., 1]),
+            M_SQRT1_2 * (N[..., 2] + sign * M[..., 2]),
+        ],
+        axis=-1,
+    )
     return out
 
 
@@ -482,13 +565,14 @@ def vsw_rA(l, m, kr, theta, phi, pol):
     sign = np.where(pol > 0, 1, -1)
     rN = vsw_rN(l, m, kr, theta, phi)
     rM = vsw_rM(l, m, kr, theta, phi)
-    out = np.array(
+    out = np.stack(
         [
-            M_SQRT1_2 * (rN[:, 0] + sign * rM[:, 0]),
-            M_SQRT1_2 * (rN[:, 1] + sign * rM[:, 1]),
-            M_SQRT1_2 * (rN[:, 2] + sign * rM[:, 2]),
-        ]
-    ).T
+            M_SQRT1_2 * (rN[..., 0] + sign * rM[..., 0]),
+            M_SQRT1_2 * (rN[..., 1] + sign * rM[..., 1]),
+            M_SQRT1_2 * (rN[..., 2] + sign * rM[..., 2]),
+        ],
+        axis=-1,
+    )
     return out
 
 
@@ -510,8 +594,19 @@ def vpw_M(
         [1j * ky * phase / kpar, -1j * kx * phase / kpar, np.zeros_like(phase)]
     ).T
     cond_k0 = k == 0
-    cond_kpar0 = (kpar == 0) & ~cond_k0
-    ans = np.select([cond_k0, cond_kpar0], [out1, out2], out3)
+    cond_kpar0 = (kpar == 0) & ~cond_k0   
+    ans = np.select(
+        [
+            cond_k0[..., None],
+            cond_kpar0[..., None],
+        ],
+        [
+            out1,
+            out2,
+        ],
+        out3,
+    )
+    
     return ans
 
 
@@ -543,7 +638,18 @@ def vpw_N(
     out1 = np.full_like(out3, np.nan)
     cond_k0 = k == 0
     cond_kpar0 = (kpar == 0) & ~cond_k0
-    ans = np.select([cond_k0, cond_kpar0], [out1, out2()], out3)
+    ans = np.select(
+        [
+            cond_k0[..., None],
+            cond_kpar0[..., None],
+        ],
+        [
+            out1,
+            out2(),
+        ],
+        out3,
+    )
+    
     return ans
 
 
@@ -552,15 +658,64 @@ def vpw_A(kx, ky, kz, x, y, z, pol):
     sign = np.where(np.array(pol) > 0, 1, -1)
     N = vpw_N(kx, ky, kz, x, y, z)
     M = vpw_M(kx, ky, kz, x, y, z)
-    out = np.array(
-        [
-            M_SQRT1_2 * (N[:, 0] + sign * M[:, 0]),
-            M_SQRT1_2 * (N[:, 1] + sign * M[:, 1]),
-            M_SQRT1_2 * (N[:, 2] + sign * M[:, 2]),
-        ]
-    ).T
+    if np.ndim(sign) > 0:
+        sign = sign[..., None]
+    out = M_SQRT1_2 * (N + sign * M)
     return out
 
+
+def efield_far_amplitude(
+    nhat, pidx, l, m, pol, positions, k0, epsilon, poltype
+):
+    """Far-field amplitude of vector spherical waves.
+
+    Returns E_infty(nhat), where
+
+        E_sca(r nhat) ~ exp(i k r) / r * E_infty(nhat)
+
+    nhat must be unit direction vectors in Cartesian coordinates,
+    shape (..., 3).
+    """
+
+    # Convert direction to spherical angles.
+    nhat = nhat[..., None, :]  # (..., 1, 3)
+    sph = car2sph(nhat)        # (..., 1, 3)
+
+    theta = sph[..., 1]
+    phi = sph[..., 2]
+
+    ks = k0 * refractive_index(epsilon)
+    k = ks[pol][None, :]
+
+    if poltype == "parity":
+        polw = pol[None, :, None]
+
+        M_inf = vsw_M_far_amplitude(l, m, theta, phi, k)
+        N_inf = vsw_N_far_amplitude(l, m, theta, phi, k)
+
+        res = (1 - polw) * M_inf + polw * N_inf
+    elif poltype == "helicity":
+        res = vsw_A_far_amplitude(l, m, theta, phi,  pol, k)
+    else:
+        raise NotImplementedError(
+            "Wrong poltype"
+        )
+
+    # Phase from scatterer center R_j:
+    # exp(-i k nhat . R_j)
+    Rj = positions[pidx]
+    phase_center = np.exp(
+        -1j * k * np.sum(nhat * Rj[None, :, :], axis=-1)
+    )
+
+    res = res * phase_center[..., None]
+
+    # Convert spherical components to Cartesian components.
+    res = vsph2car(res, sph)
+
+    ans = res.swapaxes(-1, -2)
+
+    return ans
 
 def efield(r, pidx, l, m, pol, positions, k0, epsilon, modetype, poltype):
     r"""Electric field of vector spherical waves.
@@ -606,7 +761,6 @@ def efield(r, pidx, l, m, pol, positions, k0, epsilon, modetype, poltype):
     kr = rsph[..., 0] * ks[pol][None, :]  # (P,N)
     th = rsph[..., 1]
     ph = rsph[..., 2]
-
     if poltype == "helicity":
         if modetype == "regular":
             res = vsw_rA(l, m, kr, th, ph, pol)
@@ -615,16 +769,13 @@ def efield(r, pidx, l, m, pol, positions, k0, epsilon, modetype, poltype):
     else:
 
         polw = pol[None, :, None]  # (1,N,1)
-        # polw = pol[:, None, None]
         if modetype == "regular":
             res = (1 - polw) * vsw_rM(l, m, kr, th, ph) + polw * vsw_rN(
                 l, m, kr, th, ph
             )
         else:
-            # res = np.ones((2, 180, 3))
             vm = vsw_M(l, m, kr, th, ph)
             vn = vsw_N(l, m, kr, th, ph)
-            # print("vm", vm.shape, "vn", vn.shape)
             res = (1 - polw) * vm + polw * vn
     res = vsph2car(res, rsph)
     ans = res.swapaxes(-1, -2)

@@ -181,68 +181,6 @@ def field_outside(q, modes, illu):
     field_below = q[1, 0, :, :] @ illu[0] + q[1, 1] @ illu[1]
     return field_above, field_below
 
-
-def poynting_avg(coeffs, modes, ks, helicity, epsilon=1, mu=None, above=True):
-    r"""
-    Time-averaged z-component of the Poynting vector
-
-    Calculate the time-averaged Poynting vector's z-component
-
-    .. math::
-
-        \langle S_z \rangle = \frac{1}{2} \Re (\boldsymbol E \times \boldsymbol H^\ast) \boldsymbol{\hat{z}}
-
-    on one side of the Q-matrix with the given coefficients.
-
-    Args:
-        coeffs (2-tuple): The first entry are the upwards propagating modes the
-            second one the downwards propagating modes
-        above (bool, optional): Calculate the Poynting vector above or below the
-            Q-matrix
-
-    Returns:
-        float
-    """
-    if (not isinstance(epsilon, anp.ndarray)) & (not isinstance(epsilon, list)):
-        epsilon = anp.array([epsilon, epsilon], complex)
-    if mu is None:
-        mu = anp.ones_like(epsilon)
-    choice = int(bool(above))
-    kx, ky, pol = modes
-    kz = wave_vec_z(kx, ky, ks[:, pol])
-    selections = pol == 0, pol == 1
-    pref = (
-        kz[choice, selections[0]] / ks[choice, 0],
-        kz[choice, selections[1]] / ks[choice, 1],
-    )
-
-    coeffs = [np.zeros_like(kx) if c is None else np.array(c) for c in coeffs]
-    allcoeffs = [
-        (1, -1, coeffs[0][selections[0]]),
-        (1, 1, coeffs[0][selections[1]]),
-        (-1, -1, coeffs[1][selections[0]]),
-        (-1, 1, coeffs[1][selections[1]]),
-    ]
-    res = 0
-    if helicity:
-        for (dira, pola, a), (dirb, polb, b) in itertools.product(allcoeffs, repeat=2):
-            res = res + a @ (
-                np.conjugate(b)
-                * (
-                    pola * polb * np.conjugate(pref[(polb + 1) // 2]) * dirb
-                    + pref[(pola + 1) // 2] * dira
-                )
-            )
-        res = res * 0.25
-    else:
-        for (dira, _, a), (dirb, _, b) in itertools.product(allcoeffs[::2], repeat=2):
-            res = res + a @ (np.conjugate(b) * np.conjugate(pref[0]) * dirb)
-        for (dira, _, a), (dirb, _, b) in itertools.product(allcoeffs[1::2], repeat=2):
-            res = res + a @ (np.conjugate(b) * pref[1] * dira)
-        res = res * 0.5
-    return np.real(res / anp.conjugate(anp.sqrt(mu[choice] / epsilon[choice])))
-
-
 # @partial(jit, static_argnums=(2, 3, 4, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17))
 def smat_spheres(
     radii,

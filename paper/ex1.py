@@ -1,5 +1,5 @@
 import time
-
+import os
 import h5py
 import jax
 import jax.numpy as np
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import nlopt
 import numpy as anp
 import treams
-from func_helper import field_wl_treams, fob, fob_treams, multipole_xs_treams
+from func_helper import field_wl_treams, fob, fob_treams_parallel, multipole_xs_treams
 from jax import jit, value_and_grad
 
 
@@ -166,10 +166,11 @@ name = (
     f"paper_results/num-{num}-parity-R-{R}-local-pos-rad-{wl1}-lmax-{lmax}"
     f"-pol-{pol[0]}-nsteps-{n_steps}-rad-{radius}-rl-{rl}-nph-{Nphi}-nth-{Nteta}"
 )
+os.makedirs(os.path.dirname(name), exist_ok=True)
 
 vfi, vbi = field_wl_treams(anp.array(param), cfg)
 
-forward_init_treams, backward_init_treams, tmats_init = fob_treams(
+forward_init_treams, backward_init_treams, tmats_init = fob_treams_parallel(
     anp.array(param), cfg
 )
 fob_init_treams = forward_init_treams / backward_init_treams
@@ -183,8 +184,9 @@ time_full = t1 - t0
 print("end_to_end_optimization =", time_full)
 v_final, g_final = v_g(jax.numpy.asarray(pas[-1]))
 va.append(float(v_final))
+
 # postprocess
-forward_final_treams, backward_final_treams, tmats_final = fob_treams(
+forward_final_treams, backward_final_treams, tmats_final = fob_treams_parallel(
     anp.array(pas[-1]), cfg
 )
 
