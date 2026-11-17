@@ -1,11 +1,13 @@
-# dreams 
+<p align="center">
+  <img src="docs/assets/dreams-logo.svg" alt="dreams logo" width="600">
+</p>
 
-A differentiable T-matrix-based framework for
-multiple-scattering problems in nanophotonics.
+`dreams` is a differentiable T-matrix-based framework for
+multiscattering problems in nanophotonics.
 
 It implements the T-matrix formalism in
 [jax](https://github.com/google/jax), following the implementation of
-[treams](https://github.com/tfp-photonics/treams).
+[`treams`](https://github.com/tfp-photonics/treams).
 
 ## Installation
 
